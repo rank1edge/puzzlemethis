@@ -4,7 +4,6 @@
   "installCommand": "",
   "buildCommand": "",
   "outputDirectory": "public",
-  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/:code([a-hjkmnp-z2-9]{5})",
