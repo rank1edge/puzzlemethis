@@ -8,10 +8,13 @@ async function startTable(page, name) {
   await page.click('#lvlMedium');
   await page.click('#startBtn');
   await expect(page.locator('#players')).toContainText(name);
-  return (await page.evaluate(() => location.hash)).replace('#table-', '');
+  // the table code becomes the page path: /ddr6y
+  const code = await page.evaluate(() => location.pathname.slice(1));
+  expect(code).toMatch(/^[a-z0-9]{5}$/);
+  return code;
 }
 async function joinByLink(page, code, name) {
-  await page.goto('/#table-' + code);
+  await page.goto('/' + code);
   await expect(page.locator('#invitePop')).toBeVisible();
   await expect(page.locator('#popTitle')).toContainText(code.toUpperCase());
   await expect(page.locator('#popCode')).toHaveValue(code.toUpperCase());
@@ -132,11 +135,22 @@ test('after admiring a finished painting, the leader moves on from the bar below
   await expect(b.locator('#afterBar')).toBeHidden();
 });
 
-test('closing the invite popup leaves the code ready on the main menu', async ({ browser }) => {
+test('old #table- links still open the invite', async ({ browser }) => {
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
   const code = await startTable(a, 'Ajay');
   await b.goto('/#table-' + code);
+  await expect(b.locator('#popCode')).toHaveValue(code.toUpperCase());
+  await b.fill('#popName', 'Priya'); await b.click('#popJoin');
+  await expect(a.locator('#players')).toContainText('Priya');
+  await expect.poll(() => b.evaluate(() => location.pathname)).toBe('/' + code);
+});
+
+test('closing the invite popup leaves the code ready on the main menu', async ({ browser }) => {
+  const a = await (await browser.newContext()).newPage();
+  const b = await (await browser.newContext()).newPage();
+  const code = await startTable(a, 'Ajay');
+  await b.goto('/' + code);
   await expect(b.locator('#invitePop')).toBeVisible();
   await b.click('#popClose');
   await expect(b.locator('#invitePop')).toBeHidden();

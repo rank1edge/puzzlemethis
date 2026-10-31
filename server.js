@@ -46,7 +46,8 @@ function createServer({ log = () => {} } = {}) {
   }
   function serveStatic(url, res) {
     let rel = decodeURIComponent(url.pathname);
-    if (rel === '/') rel = '/index.html';
+    // "/" and table links like "/ddr6y" both open the game
+    if (rel === '/' || /^\/[a-hjkmnp-z2-9]{5}\/?$/.test(rel)) rel = '/index.html';
     const file = path.normalize(path.join(PUBLIC, rel));
     if (!file.startsWith(PUBLIC + path.sep)) { res.writeHead(403); res.end(); return; }
     fs.readFile(file, (err, buf) => {

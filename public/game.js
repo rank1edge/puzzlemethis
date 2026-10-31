@@ -907,10 +907,32 @@ async function openTable(code, creator) {
   table = t; tableCode = code; isCreator = creator; mySince = Date.now();
   wireTable(t);
   t.presence({ name: me.name, c: me.color, since: creator ? mySince - 1e9 : mySince, role: creator ? 'host' : 'player', rd: round, cur: null }).catch(() => {});
-  try { history.replaceState(null, '', '#table-' + code); } catch (e) { try { location.hash = 'table-' + code; } catch (e2) {} }
+  showTableInAddress(code);
   return true;
 }
-function clearHash() { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+// Table links: on a website the code is the path (pezzi.vercel.app/ddr6y). Inside
+// Claude only a plain #name can travel with the link, so there it's #ddr6y.
+// Older #table-ddr6y links still open.
+const IN_CLAUDE = !!window.MJ_PAGE_URL;
+const CODE_RE = '[a-hjkmnp-z2-9]{5}';            // the letters newCode() uses
+function codeFromAddress() {
+  const p = new RegExp('^/(' + CODE_RE + ')/?$').exec(location.pathname);
+  if (p && !IN_CLAUDE) return p[1];
+  const h = new RegExp('^#(?:table-)?(' + CODE_RE + ')$').exec(location.hash || '');
+  return h ? h[1] : '';
+}
+function showTableInAddress(code) {
+  try {
+    if (IN_CLAUDE) history.replaceState(null, '', location.pathname + location.search + '#' + code);
+    else history.replaceState(null, '', '/' + code + location.search);
+  } catch (e) { try { location.hash = code; } catch (e2) {} }
+}
+function clearHash() {
+  try {
+    const path = !IN_CLAUDE && new RegExp('^/' + CODE_RE + '/?$').test(location.pathname) ? '/' : location.pathname;
+    history.replaceState(null, '', path + location.search);
+  } catch (e) {}
+}
 async function leaveTable() {
   const t = table; table = null; tableCode = ''; peersList = []; leaderLock = ''; myBans = { by: [], peer: [] }; spectator = false;
   if (t) { try { await t.leave(); } catch (e) {} }
@@ -1127,7 +1149,8 @@ function setupMenu() {
   });
   $('startBtn').addEventListener('click', onStart);
   $('joinBtn').addEventListener('click', onJoin);
-  const m = /^#table-([a-z0-9]{5})$/.exec(location.hash || '');
+  const invited = codeFromAddress();
+  const m = invited ? [null, invited] : null;
   setMenuMode('host');
   refreshMe();
   startMenuArt();
@@ -1159,10 +1182,8 @@ $('admireBtn').addEventListener('click', closeCards);
 $('afterNext').addEventListener('click', () => startRound(nextPainting()));
 $('afterStory').addEventListener('click', () => showInfo(true));
 $('nextBtn').addEventListener('click', () => startRound(nextPainting()));
-// The page's own address; a #table-code on the end opens that table.
-// The published build sets MJ_PAGE_URL to the claude.ai artifact link.
-const PAGE_URL = window.MJ_PAGE_URL || (location.origin + location.pathname);
-const tableLink = () => PAGE_URL + '#table-' + tableCode;
+// The link that opens this table. The claude.ai build sets MJ_PAGE_URL.
+const tableLink = () => IN_CLAUDE ? window.MJ_PAGE_URL + '#' + tableCode : location.origin + '/' + tableCode;
 function copyText(text, okMsg) {
   const fallback = () => {
     $('invCode').textContent = text;

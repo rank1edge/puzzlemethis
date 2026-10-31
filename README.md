@@ -68,7 +68,7 @@ tests/e2e/                Playwright two-player tests
 
 On claude.ai the page uses the artifact **room** capability (`window.claude.use('room')`). Locally, `shim-local-room.js` provides the same API, backed by `server.js`. The game code is identical in both places.
 
-Each table is a named room, `t-<code>`. Every tab sets its **presence** (`name`, colour `c`, `since`, `role`, round `rd`, pointer `cur`, the piece being dragged `drag: [id, x, y]`, and for the leader the removal lists `ban` and `bp`) and sends these events:
+Each table is a named room, `t-<code>`. Its link is the code as the page path, like `pezzi.vercel.app/ddr6y` (`vercel.json` and `server.js` serve the game for those paths). Inside Claude only a plain `#name` can travel with a link, so there it's `#ddr6y`. Old `#table-ddr6y` links still work. Every tab sets its **presence** (`name`, colour `c`, `since`, `role`, round `rd`, pointer `cur`, the piece being dragged `drag: [id, x, y]`, and for the leader the removal lists `ban` and `bp`) and sends these events:
 
 | Topic | Sent by | Data |
 | --- | --- | --- |
