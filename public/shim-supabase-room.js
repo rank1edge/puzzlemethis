@@ -25,7 +25,10 @@
   const TOPICS = ['sync.req', 'sync.state', 'round', 'move', 'moves', 'lock', 'kick'];
   const MOTION_KEYS = ['cur', 'drag'];
   const MOTION_MS = 80;                       // ~12 motion messages a second at most
-  const TRACK_MS = 150;                       // presence: at most ~7 updates a second
+  // Supabase limits presence updates per client and closes the channel of a
+  // client that goes over, so presence is only re-sent when a value really
+  // changes (name, round, leader's removal list), and at most twice a second.
+  const TRACK_MS = 500;
 
   const ABC = 'abcdefghijklmnopqrstuvwxyz0123456789';
   const rnd = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => ABC[b % 36]).join('');
@@ -41,9 +44,7 @@
       let peers = Object.freeze([]), base = {}, myMotion = {}, connected = false, left = false, settled = false;
       let trackTimer = 0, motionTimer = 0, lastMotion = '';
 
-      const ch = client.channel('mj-' + name, {
-        config: { broadcast: { self: true, ack: false }, presence: { key: PEER } }
-      });
+      let ch = null, retryTimer = 0;
       const stamp = (peer, by) => ({ peer, by: by || null, isMe: peer === PEER, sameTab: peer === PEER, kind: 'viewer', guest: false });
 
       // Rebuild the peer list from Supabase presence + motion, reusing unchanged entries.
@@ -86,9 +87,13 @@
         connected = v;
         connFns.forEach(fn => { try { fn(v); } catch (e) { console.error(e); } });
       }
+      let lastTracked = '';
       function flushTrack() {
         trackTimer = 0;
-        if (!left && connected) ch.track({ by: BY, p: JSON.stringify(base) }).catch(() => {});
+        const p = JSON.stringify(base);
+        if (left || !connected || p === lastTracked) return;
+        lastTracked = p;
+        ch.track({ by: BY, p }).catch(() => {});
       }
       function flushMotion() {
         motionTimer = 0;
@@ -97,24 +102,6 @@
         lastMotion = s;
         ch.send({ type: 'broadcast', event: 'mj.motion', payload: { p: PEER, m: myMotion } }).catch(() => {});
       }
-
-      for (const topic of TOPICS) {
-        ch.on('broadcast', { event: topic }, ({ payload }) => {
-          if (!payload || !okPeer(payload.p)) return;
-          const fns = handlers.get(topic);
-          if (!fns) return;
-          const msg = Object.freeze(Object.assign(stamp(payload.p, okPeer(payload.b) ? payload.b : null), { topic, data: payload.d }));
-          fns.forEach(fn => { try { fn(msg); } catch (e) { console.error(e); } });
-        });
-      }
-      ch.on('broadcast', { event: 'mj.motion' }, ({ payload }) => {
-        if (!payload || !okPeer(payload.p) || payload.p === PEER || !payload.m || typeof payload.m !== 'object') return;
-        motion.set(payload.p, { cur: payload.m.cur ?? null, drag: payload.m.drag ?? null });
-        rebuild();
-      });
-      ch.on('presence', { event: 'sync' }, rebuild);
-      ch.on('presence', { event: 'join' }, rebuild);
-      ch.on('presence', { event: 'leave' }, rebuild);
 
       const api = Object.freeze({
         name,
@@ -132,10 +119,12 @@
           let baseChanged = false, motionChanged = false;
           for (const k in patch) {
             const target = MOTION_KEYS.includes(k) ? myMotion : base;
-            if (patch[k] === null) { if (k in target) { delete target[k]; } }
-            else target[k] = patch[k];
+            const before = JSON.stringify(target[k]);
+            if (patch[k] === null) delete target[k]; else target[k] = patch[k];
+            if (JSON.stringify(target[k]) === before) continue;   // unchanged: send nothing
             if (target === base) baseChanged = true; else motionChanged = true;
           }
+          if (!baseChanged && !motionChanged) return Promise.resolve();
           rebuild();
           if (baseChanged && !trackTimer) trackTimer = setTimeout(flushTrack, TRACK_MS);
           if (motionChanged && !motionTimer) motionTimer = setTimeout(flushMotion, MOTION_MS);
@@ -154,21 +143,55 @@
           return () => connFns.delete(fn);
         },
         leave() {
-          left = true; handlers.clear(); peerFns.clear(); connFns.clear();
+          left = true; clearTimeout(retryTimer); handlers.clear(); peerFns.clear(); connFns.clear();
           return ch.untrack().catch(() => {}).then(() => client.removeChannel(ch)).then(() => {}, () => {});
         }
       });
 
-      ch.subscribe(status => {
-        if (status === 'SUBSCRIBED') {
-          setConnected(true);
-          ch.track({ by: BY, p: JSON.stringify(base) }).catch(() => {});
-          if (!settled) { settled = true; resolve(api); }
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          setConnected(false);
-          if (!settled) { settled = true; client.removeChannel(ch); reject({ code: 'upstream_error', message: 'Could not reach Supabase Realtime (' + status + ').' }); }
+      // Open the table's channel. If Supabase drops it later (network change, a
+      // server restart, a rate limit), open a fresh one so the table carries on.
+      function openChannel() {
+        ch = client.channel('mj-' + name, {
+          config: { broadcast: { self: true, ack: false }, presence: { key: PEER } }
+        });
+        for (const topic of TOPICS) {
+          ch.on('broadcast', { event: topic }, ({ payload }) => {
+            if (!payload || !okPeer(payload.p)) return;
+            const fns = handlers.get(topic);
+            if (!fns) return;
+            const msg = Object.freeze(Object.assign(stamp(payload.p, okPeer(payload.b) ? payload.b : null), { topic, data: payload.d }));
+            fns.forEach(fn => { try { fn(msg); } catch (e) { console.error(e); } });
+          });
         }
-      });
+        ch.on('broadcast', { event: 'mj.motion' }, ({ payload }) => {
+          if (!payload || !okPeer(payload.p) || payload.p === PEER || !payload.m || typeof payload.m !== 'object') return;
+          motion.set(payload.p, { cur: payload.m.cur ?? null, drag: payload.m.drag ?? null });
+          rebuild();
+        });
+        ch.on('presence', { event: 'sync' }, rebuild);
+        ch.on('presence', { event: 'join' }, rebuild);
+        ch.on('presence', { event: 'leave' }, rebuild);
+        const mine = ch;
+        mine.subscribe(status => {
+          if (mine !== ch) return;                       // an old channel we already replaced
+          if (status === 'SUBSCRIBED') {
+            setConnected(true);
+            lastTracked = JSON.stringify(base);
+            mine.track({ by: BY, p: lastTracked }).catch(() => {});
+            if (!settled) { settled = true; resolve(api); }
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            setConnected(false);
+            if (!settled) {
+              settled = true; client.removeChannel(mine);
+              reject({ code: 'upstream_error', message: 'Could not reach Supabase Realtime (' + status + ').' });
+            } else if (!left && !retryTimer) {
+              client.removeChannel(mine);
+              retryTimer = setTimeout(() => { retryTimer = 0; if (!left) openChannel(); }, 1500);
+            }
+          }
+        });
+      }
+      openChannel();
       setTimeout(() => { if (!settled) { settled = true; client.removeChannel(ch); reject({ code: 'upstream_error', message: 'Supabase Realtime did not answer.' }); } }, 8000);
     });
   }

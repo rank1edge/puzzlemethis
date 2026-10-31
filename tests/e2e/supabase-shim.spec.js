@@ -11,16 +11,17 @@ async function tab(context) {
 }
 
 test('tables work over Supabase Realtime: join, place, drag, remove', async ({ browser }) => {
+  test.setTimeout(60000);
   const context = await browser.newContext();
   const a = await tab(context), b = await tab(context);
 
   await a.goto('/?supabase');
   await a.fill('#nameInput', 'Ajay'); await a.click('#lvlMedium'); await a.click('#startBtn');
   await expect(a.locator('#players')).toContainText('Ajay');
-  const code = (await a.evaluate(() => location.hash)).replace('#table-', '');
+  const code = await a.evaluate(() => location.pathname.slice(1));
   expect(code).toMatch(/^[a-z0-9]{5}$/);
 
-  await b.goto('/?supabase#table-' + code);
+  await b.goto('/' + code + '?supabase');
   await expect(b.locator('#invitePop')).toBeVisible();
   await b.fill('#popName', 'Priya'); await b.click('#popJoin');
   await expect(b.locator('#menu')).toHaveClass(/gone/);
@@ -41,7 +42,12 @@ test('tables work over Supabase Realtime: join, place, drag, remove', async ({ b
     if (moved) id = moved.id; else await a.mouse.up();
   }
   expect(id).not.toBeNull();
+  // Supabase closes the channel of a client that sends presence too often, so
+  // dragging and pointing must not re-send presence at all
+  const tracksBefore = await a.evaluate(() => window.__mockTracks || 0);
   for (let i = 1; i <= 20; i++) { await a.mouse.move(114 + i * 12, 300); await a.waitForTimeout(20); }
+  for (let i = 1; i <= 20; i++) { await a.mouse.move(400 + i * 5, 500 - i * 5); await a.waitForTimeout(20); }
+  expect(await a.evaluate(() => window.__mockTracks || 0)).toBe(tracksBefore);
   await expect.poll(() => b.evaluate(i => mjDebug.pieces()[i].heldBy, id)).not.toBeNull();
   await a.mouse.up();
   const finalA = (await a.evaluate(() => mjDebug.pieces()))[id];
@@ -49,6 +55,13 @@ test('tables work over Supabase Realtime: join, place, drag, remove', async ({ b
     const p = (await b.evaluate(() => mjDebug.pieces()))[id];
     return Math.abs(p.x - finalA.x) < 0.01 && Math.abs(p.y - finalA.y) < 0.01 && !p.heldBy;
   }).toBe(true);
+
+  // if Supabase drops the leader's connection, it reopens and the table carries on
+  await a.evaluate(() => window.__dropChannels());
+  await a.waitForTimeout(2500);
+  await a.evaluate(() => mjDebug.placeOne());
+  await expect(b.locator('#placed')).toHaveText('2');
+  await expect(a.locator('#players')).toContainText('Priya');
 
   // the leader removes Priya
   await a.click('#players button.chip');

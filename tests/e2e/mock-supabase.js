@@ -11,13 +11,17 @@
       addEventListener('pagehide', () => this._close());
     }
     on(type, filter, cb) { this.binds.push({ type, event: filter.event, cb }); return this; }
-    subscribe(cb) { setTimeout(() => { cb('SUBSCRIBED'); this.bc.postMessage({ k: 'hello' }); }, 30); return this; }
+    subscribe(cb) {
+      this.statusCb = cb; (window.__mockChannels = window.__mockChannels || []).push(this);
+      setTimeout(() => { cb('SUBSCRIBED'); this.bc.postMessage({ k: 'hello' }); }, 30);
+      return this;
+    }
     send({ event, payload }) {
       const m = { k: 'bc', event, payload };
       this.bc.postMessage(m); if (this.self) setTimeout(() => this._in(m), 0);
       return Promise.resolve('ok');
     }
-    track(meta) { this.mine = meta; this.state[this.key] = [meta]; this._pres('sync'); this.bc.postMessage({ k: 'pres', key: this.key, meta }); return Promise.resolve('ok'); }
+    track(meta) { window.__mockTracks = (window.__mockTracks || 0) + 1; this.mine = meta; this.state[this.key] = [meta]; this._pres('sync'); this.bc.postMessage({ k: 'pres', key: this.key, meta }); return Promise.resolve('ok'); }
     untrack() { this.mine = null; delete this.state[this.key]; if (!this.closed) this.bc.postMessage({ k: 'pres', key: this.key, meta: null }); return Promise.resolve('ok'); }
     presenceState() { return JSON.parse(JSON.stringify(this.state)); }
     _close() { if (this.closed) return; if (this.mine) this.untrack(); this.closed = true; this.bc.close(); }
@@ -29,6 +33,10 @@
     }
     _pres(ev) { for (const b of this.binds) if (b.type === 'presence' && (b.event === ev || b.event === 'sync')) b.cb({}); }
   }
+  // test hook: act as if the server closed every open channel on this page
+  window.__dropChannels = () => {
+    for (const c of (window.__mockChannels || []).splice(0)) { c._close(); c.statusCb && c.statusCb('CLOSED'); }
+  };
   window.supabase = {
     createClient: () => ({
       channel: (name, opts) => new MockChannel(name, opts),
