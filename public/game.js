@@ -225,6 +225,10 @@ function layout() {
   dpr = Math.min(2, window.devicePixelRatio || 1);
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
   cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  bg.width = cv.width; bg.height = cv.height;
+  bg.style.width = cv.style.width; bg.style.height = cv.style.height;
+  bgKey = ''; fullRedraw = true;
+  cvRect = cv.getBoundingClientRect();
   const pl = $('players');
   topInset = pl.hidden ? 0 : pl.offsetHeight + 10;
   const wide = W >= H * 1.05;
@@ -278,6 +282,7 @@ function scatter(list) {
     const j = Math.floor(Math.random() * (i + 1)); [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
   }
   pieces.sort((a, b) => b.locked - a.locked);
+  fullRedraw = true;
 }
 
 /* ---------- drawing ---------- */
@@ -343,7 +348,12 @@ function drawPiece(p, lifted, g = ctx) {
 }
 // The board, its guide and every placed piece only change when a piece settles,
 // so they are drawn once into a background layer and reused every frame.
+// The board, its guide and placed pieces live on their own canvas underneath the
+// moving pieces, so a frame never has to repaint them.
 const bg = document.createElement('canvas'), bgCtx = bg.getContext('2d');
+bg.setAttribute('aria-hidden', 'true');
+bg.style.pointerEvents = 'none';
+cv.parentNode.insertBefore(bg, cv);
 let bgKey = '', picSeq = 0;
 function drawBackground() {
   if (!pic._v) pic._v = ++picSeq;
@@ -351,7 +361,6 @@ function drawBackground() {
   const key = [W, H, dpr, s, board.x, board.y, pic._v, COLS, ROWS, placed, ghost, done, level ? level.key : '', colors.slot, colors.varnish].join('|');
   if (key === bgKey) return;
   bgKey = key;
-  bg.width = cv.width; bg.height = cv.height;
   const g = bgCtx, { x, y, w, h } = board;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, W, H);
@@ -372,24 +381,115 @@ function drawBackground() {
   }
   for (const p of pieces) if (p.locked) drawPiece(p, false, g);
 }
+// Each frame repaints only the parts of the screen that changed: where a piece,
+// a pointer or a settle-glow was last frame and where it is now. A dragged piece
+// is a small patch instead of the whole table, which keeps high-resolution
+// screens and phones at full frame rate.
+let fullRedraw = true;
+const drawnPieces = new Map();             // piece id -> { k: state, r: rect }
+const drawnCursors = new Map();            // peer -> { k, r }
+let drawnFlashes = [];
+function pieceRect(p) {
+  const sz = (1 + 2 * PAD) * s, m = sz * 0.06 + 26;     // room for the lifted shadow
+  return [board.x + p.x * s - PAD * s - m, board.y + p.y * s - PAD * s - m, sz + 2 * m, sz + 2 * m];
+}
+const meets = (a, b) => a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
+function friendCursors() {
+  const out = [];
+  if (!table) return out;
+  for (const pr of peersList) {
+    if (pr.sameTab || pr.kind !== 'viewer') continue;
+    const c = remoteCur.get(pr.peer);
+    if (!c || pr.presence.rd !== round) continue;
+    const cx = board.x + c.x * s, cy = board.y + c.y * s;
+    if (cx < -20 || cy < -20 || cx > W + 20 || cy > H + 20) continue;
+    out.push({ peer: pr.peer, cx, cy, col: colorAt(pr.presence.c), nm: cleanName(pr.presence.name) || 'Friend' });
+  }
+  return out;
+}
 function draw(now = performance.now()) {
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, cv.width, cv.height);
-  // Nothing on the table while the main menu is up: it sits behind the menu's
-  // slightly see-through veil and would show through as a stray box.
-  if (!pic || !level) return;
+  if (!pic || !level) {
+    // Nothing on the table while the main menu is up: it sits behind the menu's
+    // slightly see-through veil and would show through as a stray box.
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+    bgCtx.setTransform(1, 0, 0, 1, 0, 0); bgCtx.clearRect(0, 0, bg.width, bg.height);
+    bgKey = ''; fullRedraw = true; drawnPieces.clear(); drawnCursors.clear();
+    return;
+  }
   drawBackground();
-  ctx.drawImage(bg, 0, 0);
+  flashes = flashes.filter(f => now - f.t < 650);
+  const fading = done && now - finishT0 < 1000;
+  const cursors = friendCursors();
+
+  // work out what changed since the last frame
+  const dirty = [];
+  const seen = new Set();
+  for (const p of pieces) {
+    if (p.locked) continue;
+    seen.add(p.id);
+    const lifted = (drag && drag.p === p) || !!p.heldBy;
+    const k = Math.round(p.x * s * 4) + ',' + Math.round(p.y * s * 4) + ',' + (lifted ? 1 : 0);
+    const was = drawnPieces.get(p.id);
+    if (!was || was.k !== k) {
+      const r = pieceRect(p);
+      if (was) dirty.push(was.r);
+      dirty.push(r);
+      drawnPieces.set(p.id, { k, r });
+    }
+  }
+  for (const [id, was] of drawnPieces) if (!seen.has(id)) { dirty.push(was.r); drawnPieces.delete(id); }
+  const curSeen = new Set();
+  for (const c of cursors) {
+    curSeen.add(c.peer);
+    const k = Math.round(c.cx) + ',' + Math.round(c.cy) + ',' + c.nm + c.col;
+    const was = drawnCursors.get(c.peer);
+    if (!was || was.k !== k) {
+      const r = [c.cx - 10, c.cy - 10, 200, 40];
+      if (was) dirty.push(was.r);
+      dirty.push(r);
+      drawnCursors.set(c.peer, { k, r });
+    }
+  }
+  for (const [peer, was] of drawnCursors) if (!curSeen.has(peer)) { dirty.push(was.r); drawnCursors.delete(peer); }
+  const flashRects = flashes.map(f => pieceRect(f.p));
+  dirty.push(...flashRects, ...drawnFlashes);
+  drawnFlashes = flashRects;
+
+  let area = 0;
+  for (const r of dirty) area += r[2] * r[3];
+  if (fading || area > W * H * 0.45) fullRedraw = true;
+  if (!fullRedraw && !dirty.length) return;          // nothing moved: draw nothing
+
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.save();
+  if (fullRedraw) ctx.clearRect(0, 0, W, H);
+  else {
+    // snap each patch to whole device pixels: a patch edge between pixels would be
+    // half-cleared and leave a faint seam
+    ctx.beginPath();
+    for (let i = 0; i < dirty.length; i++) {
+      const r = dirty[i];
+      const x0 = Math.floor(r[0] * dpr) / dpr, y0 = Math.floor(r[1] * dpr) / dpr;
+      const x1 = Math.ceil((r[0] + r[2]) * dpr) / dpr, y1 = Math.ceil((r[1] + r[3]) * dpr) / dpr;
+      dirty[i] = [x0, y0, x1 - x0, y1 - y0];
+      ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clearRect(x0, y0, x1 - x0, y1 - y0);
+    }
+    ctx.clip();
+  }
+  const touches = r => fullRedraw || dirty.some(d => meets(d, r));
   const { x, y, w, h } = board;
-  if (done) {
+
+  if (done && touches([x, y, w, h])) {
     ctx.globalAlpha = Math.min(1, (now - finishT0) / 900);
     ctx.drawImage(pic, x, y, w, h); ctx.globalAlpha = 1;
   }
-  for (const p of pieces) if (!p.locked && p !== (drag && drag.p)) drawPiece(p, !!p.heldBy);
-  if (drag) drawPiece(drag.p, true);
+  for (const p of pieces) {
+    if (p.locked || (drag && drag.p === p)) continue;
+    const d = drawnPieces.get(p.id);
+    if (d && touches(d.r)) drawPiece(p, !!p.heldBy);
+  }
+  if (drag && touches(pieceRect(drag.p))) drawPiece(drag.p, true);
 
-  flashes = flashes.filter(f => now - f.t < 650);
   for (const f of flashes) {
     const k = 1 - (now - f.t) / 650;
     ctx.save();
@@ -400,22 +500,16 @@ function draw(now = performance.now()) {
   }
 
   // friends' pointers, each in their avatar colour with their name
-  if (table) {
-    ctx.font = '600 11px Karla, system-ui, sans-serif';
-    for (const pr of peersList) {
-      if (pr.sameTab || pr.kind !== 'viewer') continue;
-      const c = remoteCur.get(pr.peer);
-      if (!c || pr.presence.rd !== round) continue;
-      const cx = board.x + c.x * s, cy = board.y + c.y * s;
-      if (cx < -20 || cy < -20 || cx > W + 20 || cy > H + 20) continue;
-      const col = colorAt(pr.presence.c), nm = cleanName(pr.presence.name) || 'Friend';
-      ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-      ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
-      const tw = ctx.measureText(nm).width;
-      rr(cx + 9, cy + 6, tw + 12, 18, 9); ctx.fillStyle = col; ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.fillText(nm, cx + 15, cy + 19);
-    }
+  if (cursors.length) ctx.font = '600 11px Karla, system-ui, sans-serif';
+  for (const c of cursors) {
+    ctx.beginPath(); ctx.arc(c.cx, c.cy, 6, 0, Math.PI * 2);
+    ctx.fillStyle = c.col; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+    const tw = ctx.measureText(c.nm).width;
+    rr(c.cx + 9, c.cy + 6, tw + 12, 18, 9); ctx.fillStyle = c.col; ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillText(c.nm, c.cx + 15, c.cy + 19);
   }
+  ctx.restore();
+  fullRedraw = false;
 }
 
 /* ---------- sound ---------- */
@@ -446,7 +540,9 @@ function stats() {
 }
 
 /* ---------- input ---------- */
-function toLocal(e) { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+// the canvas position is measured in layout(), not on every pointer event
+let cvRect = null;
+function toLocal(e) { const r = cvRect || cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
 function hit(px, py) {
   for (let i = pieces.length - 1; i >= 0; i--) {
     const p = pieces[i]; if (p.locked) continue;
@@ -1257,7 +1353,13 @@ document.addEventListener('keydown', e => {
   if (popOpen()) { if (!$('popJoin').disabled) closeInvitePop(true); } else closeCards();
 });
 
-new ResizeObserver(() => { layout(); request(); }).observe(tableEl);
+// window resizes fire in bursts; re-cut the pieces at most once per frame
+let resizeQueued = false;
+new ResizeObserver(() => {
+  if (resizeQueued) return;
+  resizeQueued = true;
+  requestAnimationFrame(() => { resizeQueued = false; layout(); request(); });
+}).observe(tableEl);
 const mq = matchMedia('(prefers-color-scheme: dark)');
 const recolor = () => { readColors(); request(); };
 mq.addEventListener ? mq.addEventListener('change', recolor) : mq.addListener(recolor);
@@ -1272,7 +1374,8 @@ if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
     peers: () => peersList.map(p => ({ peer: p.peer, you: p.sameTab, name: p.presence && p.presence.name, drag: p.presence && p.presence.drag })),
     // settle one loose piece as if it had been dragged home (for tests)
     placeOne: () => { const p = byId.find(q => !q.locked); if (!p) return false; lockPiece(p); emitT('lock', { r: round, i: p.id }); return true; },
-    frameMs: (n = 60) => { const t0 = performance.now(); for (let i = 0; i < n; i++) draw(); return +((performance.now() - t0) / n).toFixed(2); }
+    // time one full redraw of the moving-pieces layer (a normal frame repaints far less)
+    frameMs: (n = 60) => { const t0 = performance.now(); for (let i = 0; i < n; i++) { fullRedraw = true; draw(); } return +((performance.now() - t0) / n).toFixed(2); }
   };
 }
 

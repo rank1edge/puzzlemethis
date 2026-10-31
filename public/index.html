@@ -11,6 +11,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Karla:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="styles.css">
+<!-- start fetching what the first screen needs right away -->
+<link rel="preload" href="images/mona-lisa.jpg" as="image">
+<link rel="modulepreload" href="paintings.js">
 </head>
 <body>
 <header>
@@ -211,10 +214,10 @@
 
 <!-- multiplayer outside Claude; dropped from the claude.ai build -->
 <!-- on a website: Supabase Realtime. on localhost: server.js -->
-<script src="vendor/supabase-js-2.117.3.js"></script>
-<script src="config.js"></script>
-<script src="shim-supabase-room.js"></script>
-<script src="shim-local-room.js" data-local-only></script>
+<script src="vendor/supabase-js-2.117.3.js" defer></script>
+<script src="config.js" defer></script>
+<script src="shim-supabase-room.js" defer></script>
+<script src="shim-local-room.js" data-local-only defer></script>
 <script type="module" src="game.js"></script>
 </body>
 </html>

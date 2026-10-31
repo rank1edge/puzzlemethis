@@ -84,6 +84,15 @@ Drags ride in presence because the room shares it about 30 times a second, coale
 
 The board, its guide and placed pieces are drawn once into a background layer and reused until a piece settles. Loose pieces have their shadow baked into their image, so a frame is mostly plain image copies. On localhost, `mjDebug.frameMs()` in the browser console times a redraw and `mjDebug.pieces()` lists every piece.
 
+### Keeping it smooth
+
+- **Two canvas layers.** The board, guide and placed pieces sit on their own canvas, redrawn only when a piece settles. The top canvas holds the loose pieces.
+- **Only changed areas are redrawn.** Each frame repaints just the patches where a piece, pointer or glow was and now is, snapped to whole device pixels. If nothing moved, nothing is drawn.
+- **One image for all pieces.** Pieces are cut into a single atlas canvas. Resting shadows are drawn once per distinct piece outline, not per piece or per frame.
+- **Paintings preload.** Images load in the background once a table starts, and the next one as soon as a puzzle is solved.
+- **Resizes are batched.** A burst of window resize events re-cuts the pieces once per frame.
+- **Caching on Vercel.** `vercel.json` caches `images/` for a week and `vendor/` permanently. Pages and game code revalidate on every visit, so updates show up right away.
+
 The leader is whoever started the table. If they leave, the earliest remaining player takes over. Removal is enforced by each player's browser, which stops normal use but not deliberate tampering.
 
 ## Adding a painting
