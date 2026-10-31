@@ -314,8 +314,7 @@ function drawBackground() {
   g.strokeStyle = colors.varnish; g.globalAlpha = .45; g.lineWidth = 1; g.stroke(); g.globalAlpha = 1;
   g.fillStyle = colors.slot; g.fillRect(x, y, w, h);
   g.strokeStyle = colors.edge; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, w - 2, h - 2);
-  if (!level) { g.globalAlpha = .45; g.drawImage(pic, x, y, w, h); g.globalAlpha = 1; }
-  else if (!done) {
+  if (level && !done) {
     // Guide on (Easy and Medium): a faint copy of the painting.
     // Guide off, and always on Hard: a heavy blur with broad colour areas only.
     const blurred = level.blur || !ghost;
@@ -328,7 +327,9 @@ function drawBackground() {
 function draw(now = performance.now()) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, cv.width, cv.height);
-  if (!pic) return;
+  // Nothing on the table while the main menu is up: it sits behind the menu's
+  // slightly see-through veil and would show through as a stray box.
+  if (!pic || !level) return;
   drawBackground();
   ctx.drawImage(bg, 0, 0);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
