@@ -101,6 +101,37 @@ test('the leader exits to the main menu and the friend takes over', async ({ bro
   await expect(b.locator('#g-scream')).toBeEnabled();
 });
 
+test('after admiring a finished painting, the leader moves on from the bar below it', async ({ browser }) => {
+  const a = await (await browser.newContext()).newPage();
+  const b = await (await browser.newContext()).newPage();
+  const code = await startTable(a, 'Ajay');
+  await joinByLink(b, code, 'Priya');
+  await a.evaluate(() => { while (mjDebug.placeOne()) {} });
+  await expect(a.locator('#infoCard')).toHaveClass(/show/);
+  await expect(a.locator('#afterBar')).toBeHidden();
+  await a.click('#admireBtn');
+  await expect(a.locator('#afterBar')).toBeVisible();
+  await expect(a.locator('#afterNext')).toBeVisible();
+  // the bar sits below the board, inside the table
+  const box = await a.locator('#afterBar').boundingBox();
+  const table = await a.locator('#table').boundingBox();
+  expect(box.y + box.height).toBeLessThanOrEqual(table.y + table.height);
+  // Priya isn't the leader: she sees a waiting note instead
+  await expect(b.locator('#infoCard')).toHaveClass(/show/);
+  await b.click('#admireBtn');
+  await expect(b.locator('#afterWait')).toContainText('Waiting for Ajay');
+  await expect(b.locator('#afterNext')).toBeHidden();
+  // "Read the story" reopens the card; then move on
+  await a.click('#afterStory');
+  await expect(a.locator('#infoCard')).toHaveClass(/show/);
+  await a.click('#admireBtn');
+  await a.click('#afterNext');
+  await expect(a.locator('#afterBar')).toBeHidden();
+  await expect(a.locator('#artTitle')).not.toHaveText('Mona Lisa');
+  await expect(b.locator('#artTitle')).toHaveText(await a.locator('#artTitle').textContent());
+  await expect(b.locator('#afterBar')).toBeHidden();
+});
+
 test('closing the invite popup leaves the code ready on the main menu', async ({ browser }) => {
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();

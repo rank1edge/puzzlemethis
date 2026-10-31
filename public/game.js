@@ -193,13 +193,16 @@ function layout() {
   topInset = pl.hidden ? 0 : pl.offsetHeight + 10;
   const wide = W >= H * 1.05;
   const maxW = wide ? (W - 2 * M) * 0.56 : W - 2 * M;
-  const maxH = wide ? H - 2 * M - 24 - topInset : (H - 2 * M - topInset) * 0.56;
+  // keep a strip under the board free for the hint and, once finished, the next-painting bar
+  const bottomInset = 56;
+  const maxH = wide ? H - 2 * M - topInset - bottomInset : (H - 2 * M - topInset) * 0.56;
   s = Math.max(12, Math.min(maxW / COLS, maxH / ROWS));
   board.w = COLS * s; board.h = ROWS * s;
   board.x = (W - board.w) / 2;
-  board.y = wide ? Math.max(M + topInset, (H - board.h) / 2) : M + 4 + topInset;
+  board.y = wide ? Math.max(M + topInset, (H - bottomInset + topInset - board.h) / 2) : M + 4 + topInset;
   if (pic) pieces.forEach(renderPiece);
   pieces.forEach(p => { if (!p.locked) clamp(p); });
+  updateAfter();
 }
 
 function clampXY(p) { clamp(p); }
@@ -523,7 +526,26 @@ function pickPainting(pt) {
   $('switchCard').classList.add('show');
   $('switchKeep').focus({ preventScroll: true });
 }
-function closeCards() { CARDS.forEach(id => $(id).classList.remove('show')); }
+function closeCards() { CARDS.forEach(id => $(id).classList.remove('show')); updateAfter(); }
+
+/* ---------- after admiring a finished painting ---------- */
+// Once the finish card is closed, a small bar sits just below the board with
+// the way on: "Next painting" for the leader, a waiting note for everyone else.
+function updateAfter() {
+  const bar = $('afterBar');
+  const cardOpen = CARDS.some(id => $(id).classList.contains('show'));
+  const show = !!(done && level && pic && !cardOpen && $('menu').classList.contains('gone'));
+  bar.hidden = !show;
+  if (!show) return;
+  const lead = amHost() && !spectator;
+  $('afterTitle').textContent = art.title;
+  $('afterNext').hidden = !lead;
+  $('afterWait').hidden = lead;
+  $('afterWait').textContent = 'Waiting for ' + leaderName() + ' to choose the next painting';
+  // below the board when there's room, otherwise over its bottom edge
+  const h = bar.offsetHeight || 46;
+  bar.style.top = Math.max(M, Math.min(board.y + board.h + 14, H - h - 12)) + 'px';
+}
 function showInfo(complete) {
   closeCards();
   $('infoEyebrow').textContent = complete ? 'Round ' + round + ' complete' : 'The story';
@@ -542,7 +564,8 @@ function showInfo(complete) {
   if (complete) leaderButtons();
   $('infoCard').scrollTop = 0;
   $('infoCard').classList.add('show');
-  ((complete && !$('doneRow').hidden) ? $('nextBtn') : $('infoClose')).focus({ preventScroll: true });
+  updateAfter();
+  (complete ? (!$('nextBtn').hidden ? $('nextBtn') : $('admireBtn')) : $('infoClose')).focus({ preventScroll: true });
 }
 function buildGallery() {
   const grid = $('galGrid'); grid.textContent = '';
@@ -663,14 +686,17 @@ function renderPlayers() {
   request();
   if ($('inviteCard').classList.contains('show')) inviteCount();
   if ($('infoCard').classList.contains('show') && done) leaderButtons();
+  updateAfter();
 }
 function inviteCount() {
   const n = visible().length;
   $('invCount').textContent = n > 1 ? n + ' people are at this table now.' : 'Nobody else is here yet.';
 }
 function leaderButtons() {
+  // everyone can admire the finished painting; only the leader picks the next one
   const lead = amHost() && !spectator;
-  $('doneRow').hidden = !lead;
+  $('doneRow').hidden = false;
+  $('nextBtn').hidden = !lead;
   $('waitNote').hidden = lead;
   $('waitNote').textContent = 'Waiting for ' + leaderName() + ' to choose the next painting.';
 }
@@ -1040,6 +1066,7 @@ function setMenuMode(mode, code) {
 function resetToMenu(msg) {
   ++loadToken;
   closeCards();
+  $('afterBar').hidden = true;
   level = null; round = 0; dealer = ''; pieces = []; byId = []; done = false; started = false; elapsed = 0;
   drag = null; flashes = []; joining = null; queue = [];
   $('players').hidden = true;
@@ -1129,6 +1156,8 @@ $('infoClose').addEventListener('click', closeCards);
 $('galClose').addEventListener('click', closeCards);
 $('invClose').addEventListener('click', closeCards);
 $('admireBtn').addEventListener('click', closeCards);
+$('afterNext').addEventListener('click', () => startRound(nextPainting()));
+$('afterStory').addEventListener('click', () => showInfo(true));
 $('nextBtn').addEventListener('click', () => startRound(nextPainting()));
 // The page's own address; a #table-code on the end opens that table.
 // The published build sets MJ_PAGE_URL to the claude.ai artifact link.

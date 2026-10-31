@@ -35,6 +35,13 @@
 <div id="table">
   <canvas id="cv" aria-label="Jigsaw puzzle table. Drag pieces onto the board."></canvas>
   <div class="players" id="players" hidden></div>
+  <!-- after "Admire the painting": what to do next, just below the finished board -->
+  <div class="after" id="afterBar" hidden>
+    <span class="after-done" id="afterTitle">Finished</span>
+    <button class="btn primary" id="afterNext">Next painting →</button>
+    <button class="btn" id="afterStory">Read the story</button>
+    <span class="note after-wait" id="afterWait" hidden></span>
+  </div>
   <div class="hint gone" id="hint">Drag a piece onto the board. It settles in when it's close.</div>
 
   <div class="menu" id="menu" role="dialog" aria-labelledby="menuTitle">
