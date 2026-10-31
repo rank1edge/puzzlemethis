@@ -52,7 +52,10 @@ public/
   styles.css              design tokens (light and dark) and layout
   game.js                 puzzle, drawing, input, menu and table sync
   paintings.js            the collection and the stories
-  shim-local-room.js      local stand-in for claude.ai's room service
+  shim-local-room.js      local stand-in for claude.ai's room service (talks to server.js)
+  shim-supabase-room.js   the same room API over Supabase Realtime, for the public website
+  config.js               Supabase project URL and publishable key
+  vendor/                 supabase-js, served with the site
   images/<id>.jpg         one image per painting
 scripts/build-artifact.js bundles public/ into one file for claude.ai
 scripts/setup-vscode.js   copies vscode/ into .vscode/
@@ -95,6 +98,21 @@ Run `npm run build`, then ask Claude to publish `dist/masterpiece-jigsaw.html` t
 
 ## Deploying to Vercel
 
-`vercel.json` serves `public/` as a static site with no build step. Import the repo in Vercel, or run `npx vercel`, and accept the defaults.
+`vercel.json` serves `public/` as a static site with no build step. Import the repo in Vercel and deploy; no environment variables are needed.
 
-Solo play works fully there. Multiplayer does not yet: Vercel serves static files and short-lived functions, so it can't run `server.js`, which keeps every table's open connections in memory. On a static host the page notices there's no relay and falls back to solo play, and **Invite friends** says tables can't connect. Making tables work on Vercel needs a hosted realtime service, such as Supabase Realtime, behind the same room API that `shim-local-room.js` provides.
+### Multiplayer on the website: Supabase Realtime
+
+Vercel can't run `server.js`, so on the public site tables go through Supabase Realtime instead, using `public/shim-supabase-room.js`. It gives `game.js` the same room API as the other two, so the game code is identical everywhere:
+
+| Where the page runs | Multiplayer through |
+| --- | --- |
+| claude.ai | Claude's room service |
+| a website such as Vercel | Supabase Realtime (`shim-supabase-room.js`) |
+| localhost or your local network | `server.js` (`shim-local-room.js`); add `?supabase` to the address to use Supabase locally |
+
+- `public/config.js` holds the Supabase project URL and publishable key. The key is meant to be public; the game uses only Realtime channels, with no database tables.
+- `public/vendor/` holds supabase-js 2.117.3, so the site doesn't depend on a CDN.
+- Each table is the channel `mj-t-<code>`. Events go out as Broadcast messages and names/roles as Presence. Pointer and drag positions go as a Broadcast `mj.motion` message at most about 12 times a second, because the free plan allows 20 presence updates and 100 messages a second per project.
+- If Supabase can't be reached, the page falls back to solo play straight away.
+
+`npm run test:e2e` includes a test of this shim against a stand-in for supabase-js (`tests/e2e/mock-supabase.js`), since the tests run offline.

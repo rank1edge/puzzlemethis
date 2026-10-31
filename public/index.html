@@ -200,7 +200,11 @@
   </div>
 </div>
 
-<!-- local multiplayer stand-in; dropped from the published build -->
+<!-- multiplayer outside Claude; dropped from the claude.ai build -->
+<!-- on a website: Supabase Realtime. on localhost: server.js -->
+<script src="vendor/supabase-js-2.117.3.js"></script>
+<script src="config.js"></script>
+<script src="shim-supabase-room.js"></script>
 <script src="shim-local-room.js" data-local-only></script>
 <script type="module" src="game.js"></script>
 </body>

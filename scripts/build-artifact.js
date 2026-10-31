@@ -33,7 +33,7 @@ const head = [
   pick(/<meta name="claude:viewport-fit-sides"[^>]*>/, 'viewport-fit meta'),
   ...html.match(/<link rel="(preconnect|stylesheet)" href="https:\/\/fonts[^>]*>/g)
 ].join('\n');
-const body = html.slice(html.indexOf('<body>') + 6, html.indexOf('<!-- local multiplayer stand-in')).trim();
+const body = html.slice(html.indexOf('<body>') + 6, html.indexOf('<!-- multiplayer outside Claude')).trim();
 
 const out = [
   head,
