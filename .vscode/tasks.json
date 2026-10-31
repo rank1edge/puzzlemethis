@@ -1,0 +1,9 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Start server", "type": "npm", "script": "start", "isBackground": true, "problemMatcher": [] },
+    { "label": "Start server (restart on change)", "type": "npm", "script": "dev", "isBackground": true, "problemMatcher": [] },
+    { "label": "Run tests", "type": "npm", "script": "test", "group": { "kind": "test", "isDefault": true }, "problemMatcher": [] },
+    { "label": "Build published page", "type": "npm", "script": "build", "group": { "kind": "build", "isDefault": true }, "problemMatcher": [] }
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "files.exclude": { ".vscode/chrome-player-*": true, ".vscode/edge-player-*": true },
+  "search.exclude": { "dist": true, "public/images": true }
+}

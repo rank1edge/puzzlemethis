@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Masterpiece Jigsaw</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Karla:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="plaque">
+    <h1 id="artTitle">Masterpiece Jigsaw</h1>
+    <p id="artMeta">Sixteen famous paintings to piece together</p>
+  </div>
+  <div class="stats" aria-live="polite">
+    <span class="level" id="levelTag">Main menu</span>
+    <span>Round <b id="round">0</b></span>
+    <span><b id="placed">0</b> / <span id="total">0</span> placed</span>
+    <span id="clock">0:00</span>
+  </div>
+  <div class="controls">
+    <button class="btn" id="menuBtn" disabled title="Leave this table and go back to the main menu">← Main menu</button>
+    <button class="btn" id="storyBtn" disabled>Story</button>
+    <button class="btn" id="galleryBtn" disabled>Paintings</button>
+    <button class="btn" id="ghostBtn" aria-pressed="true" title="Show a faint copy of the painting on the board. When off, the board shows a soft blur.">Guide</button>
+    <button class="btn" id="tidyBtn" title="Spread the loose pieces around the board again">Tidy</button>
+    <button class="btn" id="soundBtn" aria-pressed="true">Sound</button>
+  </div>
+</header>
+
+<div id="table">
+  <canvas id="cv" aria-label="Jigsaw puzzle table. Drag pieces onto the board."></canvas>
+  <div class="players" id="players" hidden></div>
+  <div class="hint gone" id="hint">Drag a piece onto the board. It settles in when it's close.</div>
+
+  <div class="menu" id="menu" role="dialog" aria-labelledby="menuTitle">
+    <div class="menu-panel">
+      <div class="menu-art" aria-hidden="true">
+        <div class="frame"><div class="frame-inner"><img id="artA" alt=""><img id="artB" alt="" style="opacity:0"></div></div>
+        <div class="label" id="artLabel"><b>Mona Lisa</b>Leonardo da Vinci, c. 1503–1519</div>
+      </div>
+      <div class="menu-form">
+        <div>
+          <div class="eyebrow">A slow game of famous paintings</div>
+          <h2 id="menuTitle">Masterpiece Jigsaw</h2>
+        </div>
+        <p class="lede">Piece together sixteen masterpieces, from Leonardo to Hokusai, alone or with friends at the same table. Each finished painting comes with its story.</p>
+
+        <div>
+          <label class="lab" for="nameInput">Your name</label>
+          <div class="namerow">
+            <span class="avatar big" id="meAvatar">?</span>
+            <input class="field" id="nameInput" maxlength="18" placeholder="Type your name" autocomplete="nickname" spellcheck="false">
+          </div>
+          <div class="swatches" id="swatches" role="radiogroup" aria-label="Avatar colour"></div>
+        </div>
+
+        <div class="banner" id="inviteBanner" hidden>
+          <b id="bannerTitle">You're invited to a table</b>
+          <span>Type your name and press Join. You'll play at the leader's level.</span>
+        </div>
+
+        <div id="hostArea" style="display:flex;flex-direction:column;gap:20px">
+        <div>
+          <span class="lab" id="levelLab">Level</span>
+          <div class="levels" role="group" aria-labelledby="levelLab">
+            <button class="lvl" id="lvlEasy" data-level="easy" aria-pressed="true"><span class="thumb" data-n="4"></span><b>Easy</b><small>about 16 pieces</small></button>
+            <button class="lvl" id="lvlMedium" data-level="medium" aria-pressed="false"><span class="thumb" data-n="6"></span><b>Medium</b><small>about 36 pieces</small></button>
+            <button class="lvl" id="lvlHard" data-level="hard" aria-pressed="false"><span class="thumb" data-n="10"></span><b>Hard</b><small>about 100, blurred guide</small></button>
+          </div>
+        </div>
+
+        <button class="btn primary big" id="startBtn">Start a table</button>
+
+        <div class="or">or join a friend's table</div>
+        </div>
+        <div>
+          <div class="joinrow">
+            <input class="field" id="codeInput" maxlength="5" placeholder="Code" autocomplete="off" spellcheck="false" aria-label="Table code">
+            <button class="btn big" id="joinBtn">Join</button>
+          </div>
+          <p class="note" id="joinNote" style="margin-top:8px">You'll play at your friend's level.</p>
+          <button class="linkish" id="ownTableBtn" hidden>Start my own table instead</button>
+        </div>
+        <p class="msg" id="menuMsg" aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- shown over the main menu when someone opens an invite link -->
+  <div class="pop" id="invitePop" role="dialog" aria-modal="true" aria-labelledby="popTitle" hidden>
+    <div class="pop-card">
+      <button class="pop-x" id="popClose" aria-label="Close and go to the main menu">×</button>
+      <div class="eyebrow">You're invited</div>
+      <h2 id="popTitle">Join table</h2>
+      <p class="note">A friend sent you a link to their table. You'll play at their level.</p>
+      <div>
+        <label class="lab" for="popName">Your name</label>
+        <div class="namerow">
+          <span class="avatar big" id="popAvatar">?</span>
+          <input class="field" id="popName" maxlength="18" placeholder="Type your name" autocomplete="nickname" spellcheck="false">
+        </div>
+      </div>
+      <div>
+        <label class="lab" for="popCode">Table code</label>
+        <input class="field codefield" id="popCode" maxlength="5" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="btn primary big" id="popJoin">Join table</button>
+      <p class="msg" id="popMsg" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <div class="card wide" id="infoCard" role="dialog" aria-labelledby="infoTitle">
+    <button class="btn close" id="infoClose" aria-label="Close">Close</button>
+    <div class="eyebrow" id="infoEyebrow">The story</div>
+    <h2 id="infoTitle">Mona Lisa</h2>
+    <dl>
+      <dt>Artist</dt><dd id="iArtist"></dd>
+      <dt>Made</dt><dd id="iYear"></dd>
+      <dt>Medium</dt><dd id="iMedium"></dd>
+      <dt>Home</dt><dd id="iHome"></dd>
+      <dt hidden id="iTimeL">Your time</dt><dd hidden id="iTime"></dd>
+      <dt hidden id="iLevelL">Level</dt><dd hidden id="iLevel"></dd>
+    </dl>
+    <div class="story" id="iStory"></div>
+    <div class="row" id="doneRow" hidden>
+      <button class="btn primary" id="nextBtn">Next painting</button>
+      <button class="btn" id="admireBtn">Admire the painting</button>
+    </div>
+    <p class="note" id="waitNote" hidden></p>
+  </div>
+
+  <div class="card wide" id="galleryCard" role="dialog" aria-labelledby="galTitle">
+    <button class="btn close" id="galClose" aria-label="Close">Close</button>
+    <div class="eyebrow">The collection</div>
+    <h2 id="galTitle">Choose a painting</h2>
+    <p class="note" id="galNote">Your current puzzle is set aside and the one you pick starts as a new round at the same level, for everyone at the table.</p>
+    <div class="grid" id="galGrid"></div>
+  </div>
+
+  <div class="card" id="inviteCard" role="dialog" aria-labelledby="invTitle">
+    <button class="btn close" id="invClose" aria-label="Close">Close</button>
+    <div class="eyebrow">Play together</div>
+    <h2 id="invTitle">Invite friends</h2>
+    <div id="invOn">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="code" id="invCode">ABCDE</div>
+        <div class="row">
+          <button class="btn primary" id="copyLink">Copy link</button>
+          <button class="btn" id="copyCode">Copy code</button>
+          <span class="note" id="copyMsg" aria-live="polite"></span>
+        </div>
+        <ol class="steps">
+          <li>Send the link. It opens this table, so friends only type their name and press Join.</li>
+          <li>Or send the code. Friends open the game and enter it under "Join a friend's table".</li>
+          <li>You lead the table: you choose each painting and can remove anyone who joins.</li>
+        </ol>
+        <p class="note">The page is private until you share it with your friends from the Share menu. They need contributor or edit access to move pieces; with view-only access they can watch.</p>
+        <p class="note" id="invCount"></p>
+      </div>
+    </div>
+    <p class="note" id="invOff" hidden>Tables can't connect here, so inviting friends isn't available. You can keep playing on your own.</p>
+  </div>
+
+  <div class="card" id="exitCard" role="dialog" aria-labelledby="exitTitle">
+    <div class="eyebrow">Main menu</div>
+    <h2 id="exitTitle">Leave this table?</h2>
+    <p class="note" id="exitNote"></p>
+    <div class="row">
+      <button class="btn primary" id="exitStay">Keep playing</button>
+      <button class="btn" id="exitGo">Exit to main menu</button>
+    </div>
+  </div>
+
+  <div class="card" id="switchCard" role="dialog" aria-labelledby="switchTitle">
+    <div class="eyebrow">Puzzle in progress</div>
+    <div class="switch-pair">
+      <span class="swatch-art" id="switchFrom"></span><span class="arrow" aria-hidden="true">→</span><span class="swatch-art" id="switchTo"></span>
+    </div>
+    <h2 id="switchTitle">Start a new painting?</h2>
+    <p class="note" id="switchNote"></p>
+    <div class="row">
+      <button class="btn primary" id="switchKeep">Keep playing</button>
+      <button class="btn" id="switchGo">Start new painting</button>
+    </div>
+  </div>
+
+  <div class="card" id="kickCard" role="dialog" aria-labelledby="kickTitle">
+    <div class="eyebrow">Table leader</div>
+    <div class="row" style="gap:12px"><span class="avatar big" id="kickAvatar"></span><h2 id="kickTitle">Remove this player?</h2></div>
+    <p class="note">They leave the table straight away and can't rejoin this table. Pieces they placed stay on the board.</p>
+    <div class="row">
+      <button class="btn primary" id="kickYes">Remove from table</button>
+      <button class="btn" id="kickNo">Keep playing together</button>
+    </div>
+  </div>
+</div>
+
+<!-- local multiplayer stand-in; dropped from the published build -->
+<script src="shim-local-room.js" data-local-only></script>
+<script type="module" src="game.js"></script>
+</body>
+</html>

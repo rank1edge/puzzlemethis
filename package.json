@@ -1,0 +1,20 @@
+{
+  "name": "masterpiece-jigsaw",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A relaxing jigsaw of famous paintings, with shared tables for friends.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test tests/server.test.js",
+    "build": "node scripts/build-artifact.js",
+    "test:e2e": "playwright test",
+    "setup:vscode": "node scripts/setup-vscode.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.48.2"
+  }
+}
