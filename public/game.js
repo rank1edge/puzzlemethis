@@ -37,12 +37,29 @@ const cleanName = s => String(s == null ? '' : s)
 const colorAt = i => AVATAR_COLORS[(Number.isInteger(i) && i >= 0 && i < AVATAR_COLORS.length) ? i : 7];
 
 const loaded = {};
+const loading = {};                         // id -> promise, so a painting is fetched once
 function loadImage(id) {
   if (loaded[id]) return Promise.resolve(loaded[id]);
+  if (loading[id]) return loading[id];
   const im = new Image(); im.src = IMAGES[id].src;
-  return (im.decode ? im.decode() : new Promise(r => { im.onload = r; }))
+  return (loading[id] = (im.decode ? im.decode() : new Promise(r => { im.onload = r; }))
     .catch(() => new Promise(r => { if (im.complete) r(); else im.onload = r; }))
-    .then(() => (loaded[id] = im));
+    .then(() => (loaded[id] = im)));
+}
+// Fetch every painting quietly in the background once a table starts, one at a
+// time, so "Next painting" (or a friend's new round) never waits on the network.
+let preloadStarted = false;
+function preloadPaintings() {
+  if (preloadStarted) return;
+  preloadStarted = true;
+  const ids = [peekNextPainting().id, ...PAINTINGS.map(p => p.id)];
+  const step = () => {
+    const id = ids.shift();
+    if (!id) return;
+    if (loaded[id]) { step(); return; }
+    loadImage(id).then(() => setTimeout(step, 30), () => setTimeout(step, 30));
+  };
+  setTimeout(step, 600);
 }
 
 /* ---------- game state ---------- */
@@ -129,35 +146,54 @@ function build(es) {
       r === ROWS - 1 ? 0 : h(r, c),
       c === 0 ? 0 : -v(r, c - 1)
     ];
-    const p = { id: r * COLS + c, r, c, e, path: piecePath(e), x: 0, y: 0, locked: false, canvas: null };
+    const p = { id: r * COLS + c, r, c, e, path: piecePath(e), x: 0, y: 0, locked: false, shadow: null };
     pieces.push(p); byId.push(p);
   }
 }
 
-function renderPiece(p) {
-  const px = s * dpr, size = Math.ceil((1 + 2 * PAD) * px);
-  const cnv = p.canvas || (p.canvas = document.createElement('canvas'));
-  cnv.width = cnv.height = size;
-  const g = cnv.getContext('2d');
-  g.setTransform(px, 0, 0, px, PAD * px, PAD * px);
-  g.save();
-  g.clip(p.path);
+// All pieces are cut into one shared image (the atlas), one cell per piece, and
+// their soft resting shadows into a second one, drawn once per distinct piece
+// outline. Hundreds of small canvases and a blurred shadow per piece made dealing
+// a new painting slow; this keeps it to a few milliseconds.
+const atlas = document.createElement('canvas'), shadowAtlas = document.createElement('canvas');
+let cellPx = 0, shadowM = 0, shadowCells = new Map();
+const outlineKey = e => e.join(',');
+function renderPieces() {
+  const px = s * dpr;
+  cellPx = Math.ceil((1 + 2 * PAD) * px);
+  atlas.width = COLS * cellPx; atlas.height = ROWS * cellPx;
+  const g = atlas.getContext('2d');
   const iw = pic.width / COLS, ih = pic.height / ROWS;
-  g.drawImage(pic, (p.c - PAD) * iw, (p.r - PAD) * ih, (1 + 2 * PAD) * iw, (1 + 2 * PAD) * ih,
-              -PAD, -PAD, 1 + 2 * PAD, 1 + 2 * PAD);
-  g.lineWidth = 3 / px; g.strokeStyle = 'rgba(25,15,0,.38)'; g.stroke(p.path);
-  g.translate(-0.9 / px, -0.9 / px);
-  g.lineWidth = 1.4 / px; g.strokeStyle = 'rgba(255,244,215,.30)'; g.stroke(p.path);
-  g.restore();
-  // loose sprite: the same piece with its soft resting shadow baked in (canvas
-  // shadows are slow, so they are drawn once here rather than every frame)
-  const m = Math.ceil(8 * dpr), L = size + 2 * m;
-  const lc = p.loose || (p.loose = document.createElement('canvas'));
-  lc.width = lc.height = L;
-  const lg = lc.getContext('2d');
-  lg.shadowColor = 'rgba(0,0,0,.24)'; lg.shadowBlur = 5 * dpr; lg.shadowOffsetY = 2 * dpr;
-  lg.drawImage(cnv, m, m);
-  p.looseM = m;
+  for (const p of byId) {
+    g.setTransform(px, 0, 0, px, p.c * cellPx + PAD * px, p.r * cellPx + PAD * px);
+    g.save();
+    g.clip(p.path);
+    g.drawImage(pic, (p.c - PAD) * iw, (p.r - PAD) * ih, (1 + 2 * PAD) * iw, (1 + 2 * PAD) * ih,
+                -PAD, -PAD, 1 + 2 * PAD, 1 + 2 * PAD);
+    // soft bevel so cut edges read like pressed cardboard
+    g.lineWidth = 3 / px; g.strokeStyle = 'rgba(25,15,0,.38)'; g.stroke(p.path);
+    g.translate(-0.9 / px, -0.9 / px);
+    g.lineWidth = 1.4 / px; g.strokeStyle = 'rgba(255,244,215,.30)'; g.stroke(p.path);
+    g.restore();
+  }
+  // one shadow per distinct outline (at most 81 kinds, usually far fewer)
+  shadowM = Math.ceil(8 * dpr);
+  const keys = [...new Set(byId.map(p => outlineKey(p.e)))];
+  const sc = cellPx + 2 * shadowM, per = Math.ceil(Math.sqrt(keys.length));
+  shadowAtlas.width = per * sc; shadowAtlas.height = Math.ceil(keys.length / per) * sc;
+  const sg = shadowAtlas.getContext('2d');
+  sg.fillStyle = '#000'; sg.shadowColor = 'rgba(0,0,0,.24)'; sg.shadowBlur = 5 * dpr; sg.shadowOffsetY = 2 * dpr;
+  // draw each outline far off to the left and let only its shadow land in the cell
+  const FAR = 4 * shadowAtlas.width + 1000;
+  sg.shadowOffsetX = FAR;
+  shadowCells = new Map();
+  keys.forEach((k, i) => {
+    const cx = (i % per) * sc, cy = Math.floor(i / per) * sc;
+    shadowCells.set(k, [cx, cy]);
+    sg.setTransform(px, 0, 0, px, cx + shadowM + PAD * px - FAR, cy + shadowM + PAD * px);
+    sg.fill(byId.find(p => outlineKey(p.e) === k).path);
+  });
+  for (const p of byId) p.shadow = shadowCells.get(outlineKey(p.e));
 }
 
 /* ---------- blurred guide ---------- */
@@ -200,7 +236,7 @@ function layout() {
   board.w = COLS * s; board.h = ROWS * s;
   board.x = (W - board.w) / 2;
   board.y = wide ? Math.max(M + topInset, (H - bottomInset + topInset - board.h) / 2) : M + 4 + topInset;
-  if (pic) pieces.forEach(renderPiece);
+  if (pic && byId.length) renderPieces();
   pieces.forEach(p => { if (!p.locked) clamp(p); });
   updateAfter();
 }
@@ -218,15 +254,21 @@ function scatter(list) {
   const bx0 = board.x - s * 0.55, by0 = board.y - s * 0.55, bx1 = board.x + board.w + s * 0.55, by1 = board.y + board.h + s * 0.55;
   const yTop = M + topInset + s * PAD;
   for (const p of list) {
-    let best = null, bestD = -1;
-    for (let i = 0; i < 90; i++) {
+    // try random spots off the board and keep the one farthest from other pieces;
+    // squared distances, and a candidate is dropped as soon as it can't win
+    let best = null, bestD2 = -1;
+    const good2 = (s * 1.25) ** 2;
+    for (let i = 0; i < 48; i++) {
       const x = M + s * PAD + Math.random() * Math.max(1, W - 2 * M - s * (1 + 2 * PAD));
       const y = yTop + Math.random() * Math.max(1, H - M - yTop - s * (1 + PAD));
       if (x + s > bx0 && x < bx1 && y + s > by0 && y < by1) continue;
-      let d = Infinity;
-      for (const q of placed) d = Math.min(d, Math.hypot(q[0] - x, q[1] - y));
-      if (d > bestD) { bestD = d; best = [x, y]; }
-      if (d > s * 1.25) break;
+      let d2 = Infinity;
+      for (let k = 0; k < placed.length && d2 > bestD2; k++) {
+        const dx = placed[k][0] - x, dy = placed[k][1] - y, q = dx * dx + dy * dy;
+        if (q < d2) d2 = q;
+      }
+      if (d2 > bestD2) { bestD2 = d2; best = [x, y]; }
+      if (d2 > good2) break;
     }
     if (!best) best = [M + Math.random() * (W - 2 * M - s), M + Math.random() * (H - 2 * M - s)];
     placed.push(best);
@@ -279,10 +321,13 @@ function rr(x, y, w, h, r) {
 }
 function drawPiece(p, lifted, g = ctx) {
   const x = board.x + p.x * s - PAD * s, y = board.y + p.y * s - PAD * s, sz = (1 + 2 * PAD) * s;
-  if (p.locked) { g.drawImage(p.canvas, x, y, sz, sz); return; }
+  const ax = p.c * cellPx, ay = p.r * cellPx;
+  if (p.locked) { g.drawImage(atlas, ax, ay, cellPx, cellPx, x, y, sz, sz); return; }
   if (!lifted) {
-    const f = sz / p.canvas.width, m = p.looseM * f;
-    ctx.drawImage(p.loose, x - m, y - m, sz + 2 * m, sz + 2 * m);
+    // its shadow, then the piece on top
+    const f = sz / cellPx, m = shadowM * f, sc = cellPx + 2 * shadowM;
+    ctx.drawImage(shadowAtlas, p.shadow[0], p.shadow[1], sc, sc, x - m, y - m, sz + 2 * m, sz + 2 * m);
+    ctx.drawImage(atlas, ax, ay, cellPx, cellPx, x, y, sz, sz);
     return;
   }
   ctx.save();
@@ -293,7 +338,7 @@ function drawPiece(p, lifted, g = ctx) {
     const cx = x + sz / 2, cy = y + sz / 2;
     ctx.translate(cx, cy); ctx.scale(1.04, 1.04); ctx.translate(-cx, -cy);
   }
-  ctx.drawImage(p.canvas, x, y, sz, sz);
+  ctx.drawImage(atlas, ax, ay, cellPx, cellPx, x, y, sz, sz);
   ctx.restore();
 }
 // The board, its guide and every placed piece only change when a piece settles,
@@ -606,6 +651,7 @@ function finish() {
   tick();
   finishT0 = performance.now();
   finished.add(art.id);
+  loadImage(peekNextPainting().id).catch(() => {});   // have the next one ready
   setTimeout(chime, 250);
   setTimeout(() => showInfo(true), 1300);
 }
@@ -939,13 +985,14 @@ async function leaveTable() {
 }
 
 /* ---------- rounds ---------- */
-function nextPainting() {
+function peekNextPainting() {
   if (!queue.length) {
     queue = PAINTINGS.filter(p => p !== art);
     for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; }
   }
-  return queue.shift();
+  return queue[0];
 }
+function nextPainting() { peekNextPainting(); return queue.shift(); }
 function updatePlaque() {
   $('artTitle').textContent = art.title;
   $('artMeta').textContent = art.artist + ' · ' + art.year;
@@ -978,6 +1025,7 @@ function setLevel(lv) {
   if (level.blur) { g.disabled = true; g.setAttribute('aria-pressed', 'false'); g.title = 'Hard level always uses the blurred board'; }
 }
 function enterGame() {
+  preloadPaintings();
   $('menu').classList.add('gone');
   $('players').hidden = false;
   $('storyBtn').disabled = false; $('galleryBtn').disabled = false; $('menuBtn').disabled = false;
