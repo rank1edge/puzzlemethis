@@ -3,8 +3,8 @@ const { test, expect } = require('@playwright/test');
 
 test('every language has every interface string and painting text', async ({ page }) => {
   await page.goto('/');
-  expect(await page.evaluate(() => mjDebug.missingKeys())).toEqual({ en: [], ru: [] });
-  expect(await page.evaluate(() => mjDebug.missingPaintingText())).toEqual({ ru: [] });
+  expect(await page.evaluate(() => mjDebug.missingKeys())).toEqual({ en: [], fr: [], de: [], it: [], ru: [], ja: [] });
+  expect(await page.evaluate(() => mjDebug.missingPaintingText())).toEqual({ fr: [], de: [], it: [], ru: [], ja: [] });
 });
 
 test('switching to Russian translates the menu, the game and the stories, and is remembered', async ({ page }) => {
@@ -69,4 +69,22 @@ test('each player sees their own language at a shared table', async ({ browser }
   await expect(a.locator('#players')).toContainText('Аня');
   await expect(b.locator('#players')).toContainText('ведущий');
   await expect(a.locator('#players')).toContainText('leader');
+});
+
+test('every language: the dropdown lists it and it translates the menu and a painting', async ({ page }) => {
+  const cases = {
+    fr: ['Ouvrir une table', 'La Joconde'], de: ['Tisch eröffnen', 'Mona Lisa'], it: ['Apri un tavolo', 'La Gioconda'],
+    ru: ['Открыть стол', 'Мона Лиза'], ja: ['テーブルを開く', 'モナ・リザ']
+  };
+  await page.goto('/');
+  const options = await page.locator('#langSelect option').evaluateAll(os => os.map(o => o.value));
+  expect(options).toEqual(['en', 'fr', 'de', 'it', 'ru', 'ja']);
+  for (const [code, [start, title]] of Object.entries(cases)) {
+    await page.selectOption('#langSelect', code);
+    await expect(page.locator('#startBtn')).toHaveText(start);
+    await expect(page.locator('#artLabel b')).toHaveText(title);
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe(code);
+  }
+  // Japanese switches to Japanese typefaces
+  expect(await page.evaluate(() => getComputedStyle(document.body).fontFamily)).toContain('Zen Kaku Gothic New');
 });

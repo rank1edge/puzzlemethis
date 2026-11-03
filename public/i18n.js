@@ -1,22 +1,31 @@
 // Interface text in every language the game supports.
 //
-// Adding a language (French, Italian, German, Japanese, ...):
-//   1. add it to LANGUAGES, with fonts that cover its script if the default
-//      fonts don't (Japanese needs its own, for example),
-//   2. add a dictionary to STRINGS with the same keys as `en`,
-//   3. optionally add painting texts (see paintings.ru.js) to PAINTING_TEXT in game.js.
-// Missing keys fall back to English, so a half-finished dictionary still works.
+// English lives here; every other language is one file in locales/ with its
+// interface text (`ui`, same keys as `en` below), its fonts if the default ones
+// don't cover its script, and its painting texts (`paintings`, same ids and
+// fields as paintings.js).
+//
+// Adding a language: copy a locales/ file, translate it, import it below and
+// add it to LOCALES (and to MODULES in scripts/build-artifact.js).
+// Missing keys fall back to English, so a half-finished file still works.
 //
 // Values may contain {placeholders}. A value can also be an object of plural
 // forms ({ one, few, many, other }), chosen by Intl.PluralRules from vars.n.
 
-export const LANGUAGES = [
-  { code: 'en', name: 'English' },
-  { code: 'ru', name: 'Русский',
-    // Marcellus and Karla have no Cyrillic: Forum and Golos Text keep the same feel
-    fonts: { display: '"Forum", "Marcellus", Georgia, serif', body: '"Golos Text", "Karla", system-ui, sans-serif',
-             css: 'https://fonts.googleapis.com/css2?family=Forum&family=Golos+Text:wght@400;500;700&display=swap' } }
-];
+import { LOCALE_FR } from './locales/fr.js';
+import { LOCALE_IT } from './locales/it.js';
+import { LOCALE_DE } from './locales/de.js';
+import { LOCALE_RU } from './locales/ru.js';
+import { LOCALE_JA } from './locales/ja.js';
+
+// Order here is the order in the language dropdown.
+const LOCALES = [LOCALE_FR, LOCALE_DE, LOCALE_IT, LOCALE_RU, LOCALE_JA];
+
+export const LANGUAGES = [{ code: 'en', name: 'English' }]
+  .concat(LOCALES.map(l => ({ code: l.code, name: l.name, fonts: l.fonts })));
+
+// painting titles, artists, dates, media, museums and stories, per language
+export const PAINTING_TEXT = Object.fromEntries(LOCALES.map(l => [l.code, l.paintings || {}]));
 
 const STRINGS = {
   en: {
@@ -157,148 +166,10 @@ const STRINGS = {
     'msg.banned': '{name} removed you from table {code}, so you can’t rejoin it.',
     'msg.nobody': 'Nobody is at table {code} right now. Check the code with your friend, or start your own table.',
     'msg.removed': '{name} removed you from the table.'
-  },
-
-  ru: {
-    'app.tagline': 'Шестнадцать знаменитых картин, которые нужно собрать',
-    'stats.mainMenu': 'Главное меню',
-    'stats.round': 'Раунд',
-    'stats.placed': 'на месте',
-    'btn.menu': '← Главное меню',
-    'btn.menu.title': 'Покинуть стол и вернуться в главное меню',
-    'btn.story': 'История',
-    'btn.gallery': 'Картины',
-    'btn.guide': 'Подсказка',
-    'btn.guide.title': 'Показывать на поле бледную копию картины. Если выключить, поле будет размытым.',
-    'btn.guide.hardTitle': 'На сложном уровне поле всегда размыто',
-    'btn.tidy': 'Разложить',
-    'btn.tidy.title': 'Снова разложить свободные фрагменты вокруг поля',
-    'btn.sound': 'Звук',
-    'lang.label': 'Язык',
-    'canvas.label': 'Стол с пазлом. Перетаскивайте фрагменты на поле.',
-    'hint': 'Перетащите фрагмент на поле — рядом со своим местом он встанет сам.',
-
-    'after.finished': 'Готово',
-    'after.next': 'Следующая картина →',
-    'after.story': 'Прочитать историю',
-    'after.wait': 'Следующую картину выбирает {name}',
-
-    'menu.eyebrow': 'Неспешная игра со знаменитыми картинами',
-    'menu.lede': 'Соберите шестнадцать шедевров — от Леонардо до Хокусая — в одиночку или с друзьями за одним столом. К каждой собранной картине прилагается её история.',
-    'menu.name': 'Ваше имя',
-    'menu.name.placeholder': 'Введите имя',
-    'menu.colours': 'Цвет аватара',
-    'menu.colour': 'Цвет {n}',
-    'menu.level': 'Уровень',
-    'level.easy': 'Лёгкий',
-    'level.medium': 'Средний',
-    'level.hard': 'Сложный',
-    'level.easy.note': 'около 16 фрагментов',
-    'level.medium.note': 'около 36 фрагментов',
-    'level.hard.note': 'около 100, размытая подсказка',
-    'menu.start': 'Открыть стол',
-    'menu.or': 'или сядьте за стол друга',
-    'menu.code.placeholder': 'Код',
-    'menu.code.label': 'Код стола',
-    'menu.join': 'Войти',
-    'menu.joinNote': 'Уровень сложности задаёт тот, кто открыл стол.',
-    'menu.ownTable': 'Лучше открыть свой стол',
-    'menu.banner.title': 'Вас приглашают за стол {code}',
-    'menu.banner.text': 'Введите имя и нажмите «Войти». Уровень сложности задаёт ведущий стола.',
-
-    'pop.eyebrow': 'Вас пригласили',
-    'pop.title': 'Стол {code}',
-    'pop.note': 'Друг прислал вам ссылку на свой стол. Уровень сложности задаёт ведущий стола.',
-    'pop.close': 'Закрыть и перейти в главное меню',
-    'pop.code': 'Код стола',
-    'pop.join': 'Сесть за стол',
-
-    'card.close': 'Закрыть',
-    'info.story': 'История',
-    'info.roundDone': 'Раунд {n} завершён',
-    'info.artist': 'Художник',
-    'info.made': 'Создана',
-    'info.medium': 'Техника',
-    'info.home': 'Где хранится',
-    'info.yourTime': 'Ваше время',
-    'info.tableTime': 'Время стола',
-    'info.level': 'Уровень',
-    'info.levelValue': { one: '{level} · {n} фрагмент', few: '{level} · {n} фрагмента', many: '{level} · {n} фрагментов', other: '{level} · {n} фрагмента' },
-    'info.next': 'Следующая картина',
-    'info.admire': 'Полюбоваться картиной',
-    'info.wait': 'Следующую картину выбирает {name}.',
-
-    'gal.eyebrow': 'Коллекция',
-    'gal.title': 'Выберите картину',
-    'gal.note': 'Текущий пазл откладывается, а выбранная картина начнётся новым раундом того же уровня — у всех за столом.',
-    'gal.noteFollower': 'Картину выбирает ведущий стола — {name}. Здесь можно просто посмотреть коллекцию.',
-    'gal.solved': 'Собрана',
-
-    'inv.eyebrow': 'Играть вместе',
-    'inv.title': 'Пригласить друзей',
-    'inv.copyLink': 'Скопировать ссылку',
-    'inv.copyCode': 'Скопировать код',
-    'inv.linkCopied': 'Ссылка скопирована',
-    'inv.codeCopied': 'Код скопирован',
-    'inv.selected': 'Выделено — скопируйте и отправьте.',
-    'inv.step1': 'Отправьте ссылку. Она открывает этот стол — друзьям останется ввести имя и нажать «Сесть за стол».',
-    'inv.step2': 'Или отправьте код. Друзья откроют игру и введут его в поле «или сядьте за стол друга».',
-    'inv.step3': 'Вы ведущий стола: вы выбираете картины и можете удалить любого, кто присоединился.',
-    'inv.claudeNote': 'Страница закрыта, пока вы не поделитесь ею с друзьями через меню «Поделиться». Чтобы двигать фрагменты, им нужен доступ участника или редактора; с доступом только на просмотр они смогут наблюдать.',
-    'inv.count': { one: 'Сейчас за столом {n} человек.', few: 'Сейчас за столом {n} человека.', many: 'Сейчас за столом {n} человек.', other: 'Сейчас за столом {n} человека.' },
-    'inv.alone': 'Пока за столом больше никого нет.',
-    'inv.off': 'Здесь столы не подключаются, поэтому пригласить друзей нельзя. Можно играть одному.',
-
-    'exit.eyebrow': 'Главное меню',
-    'exit.title': 'Покинуть стол?',
-    'exit.stay': 'Продолжить игру',
-    'exit.go': 'Выйти в главное меню',
-    'progress.you': { one: 'Вы собрали {placed} из {n} фрагмента картины «{title}».', few: 'Вы собрали {placed} из {n} фрагментов картины «{title}».', many: 'Вы собрали {placed} из {n} фрагментов картины «{title}».', other: 'Вы собрали {placed} из {n} фрагмента картины «{title}».' },
-    'progress.table': { one: 'За столом собрано {placed} из {n} фрагмента картины «{title}».', few: 'За столом собрано {placed} из {n} фрагментов картины «{title}».', many: 'За столом собрано {placed} из {n} фрагментов картины «{title}».', other: 'За столом собрано {placed} из {n} фрагмента картины «{title}».' },
-    'exit.friendLeads': 'Ваш друг продолжит игру, а ведущим станет следующий игрок.',
-    'exit.friendsLead': 'Ваши друзья продолжат игру, а ведущим станет следующий игрок.',
-    'exit.friend': 'Ваш друг продолжит игру без вас.',
-    'exit.friends': 'Ваши друзья продолжат игру без вас.',
-    'exit.rejoin': 'Вернуться можно по коду стола {code}.',
-    'exit.notSaved': 'Пазл не сохранится.',
-
-    'switch.eyebrow': 'Пазл не закончен',
-    'switch.titleNew': 'Начать «{title}»?',
-    'switch.titleSame': 'Начать «{title}» заново?',
-    'switch.clears': 'Если начать новую картину, они пропадут.',
-    'switch.clearsTable': 'Если начать новую картину, они пропадут у всех за столом.',
-    'switch.mixes': 'Если начать заново, все фрагменты перемешаются.',
-    'switch.mixesTable': 'Если начать заново, все фрагменты перемешаются у всех за столом.',
-    'switch.keep': 'Продолжить «{title}»',
-    'switch.go': 'Начать «{title}»',
-    'switch.again': 'Начать заново',
-
-    'kick.eyebrow': 'Ведущий стола',
-    'kick.title': 'Удалить из-за стола: {name}?',
-    'kick.thisPlayer': 'этот игрок',
-    'kick.note': 'Игрок сразу покинет стол и не сможет вернуться за него. Собранные им фрагменты останутся на поле.',
-    'kick.yes': 'Удалить из-за стола',
-    'kick.no': 'Продолжить вместе',
-
-    'players.you': 'вы',
-    'players.leader': 'ведущий',
-    'players.guest': 'гость',
-    'players.friend': 'Друг',
-    'players.invite': 'Пригласить друзей',
-    'players.remove': 'Удалить из-за стола: {name}',
-    'players.watching': 'Только просмотр: чтобы двигать фрагменты, нужен доступ на редактирование',
-    'leader.fallback': 'Ведущий',
-
-    'msg.needName': 'Сначала введите имя, чтобы друзья знали, кто вы.',
-    'msg.setting': 'Готовим стол…',
-    'msg.codeLength': 'Код стола состоит из 5 букв и цифр.',
-    'msg.looking': 'Ищем стол {code}…',
-    'msg.noRooms': 'Здесь столы не подключаются. Можно открыть свой стол и играть одному.',
-    'msg.banned': 'Вас удалили из-за стола {code} (ведущий — {name}), поэтому вернуться за него нельзя.',
-    'msg.nobody': 'Сейчас за столом {code} никого нет. Уточните код у друга или откройте свой стол.',
-    'msg.removed': 'Вас удалили из-за стола (ведущий — {name}).'
   }
 };
+
+for (const l of LOCALES) STRINGS[l.code] = l.ui;
 
 let current = 'en';
 let plural = new Intl.PluralRules('en');

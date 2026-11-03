@@ -3,8 +3,7 @@
 // or shim-local-room.js talking to server.js when run locally.
 
 import { PAINTINGS } from './paintings.js';
-import { PAINTINGS_RU } from './paintings.ru.js';
-import { LANGUAGES, t, setLang, currentLang, pickInitialLang, translatePage, missingKeys } from './i18n.js';
+import { LANGUAGES, PAINTING_TEXT, t, setLang, currentLang, pickInitialLang, translatePage, missingKeys } from './i18n.js';
 
 (() => {
 // `t` is used for local variables below, so the translation lookup goes by `tr`
@@ -15,7 +14,6 @@ const IMAGES = window.MJ_IMAGES || Object.fromEntries(PAINTINGS.map(p => [p.id, 
 const BY_ID = Object.fromEntries(PAINTINGS.map(p => [p.id, p]));
 // A painting's title, artist, dates, medium, museum and story in the current
 // language, falling back to English for anything not translated.
-const PAINTING_TEXT = { ru: PAINTINGS_RU };
 function P(pt) {
   const loc = PAINTING_TEXT[currentLang()];
   return loc && loc[pt.id] ? Object.assign({}, pt, loc[pt.id]) : pt;
@@ -246,7 +244,7 @@ function layout() {
   const wide = W >= H * 1.05;
   const maxW = wide ? (W - 2 * M) * 0.56 : W - 2 * M;
   // keep a strip under the board free for the hint and, once finished, the next-painting bar
-  const bottomInset = 56;
+  const bottomInset = H < 420 ? 44 : 56;
   const maxH = wide ? H - 2 * M - topInset - bottomInset : (H - 2 * M - topInset) * 0.56;
   s = Math.max(12, Math.min(maxW / COLS, maxH / ROWS));
   board.w = COLS * s; board.h = ROWS * s;
@@ -1137,6 +1135,7 @@ function setLevel(lv) {
 }
 function enterGame() {
   preloadPaintings();
+  document.body.classList.add('in-game');
   $('menu').classList.add('gone');
   $('players').hidden = false;
   $('storyBtn').disabled = false; $('galleryBtn').disabled = false; $('menuBtn').disabled = false;
@@ -1246,6 +1245,7 @@ function setMenuMode(mode, code) {
 // Back to the main menu, e.g. after the leader removes you.
 function resetToMenu(msg) {
   ++loadToken;
+  document.body.classList.remove('in-game');
   closeCards();
   $('afterBar').hidden = true;
   level = null; round = 0; dealer = ''; pieces = []; byId = []; done = false; started = false; elapsed = 0;
@@ -1418,6 +1418,17 @@ document.addEventListener('keydown', e => {
   if (popOpen()) { if (!$('popJoin').disabled) closeInvitePop(true); } else closeCards();
 });
 
+// the header's button row scrolls sideways on small screens: fade whichever
+// edge has more buttons beyond it
+const controlsEl = $('controls');
+function markScroll() {
+  const c = controlsEl, more = c.scrollWidth > c.clientWidth + 2;
+  c.classList.toggle('more-left', more && c.scrollLeft > 2);
+  c.classList.toggle('more-right', more && c.scrollLeft + c.clientWidth < c.scrollWidth - 2);
+}
+controlsEl.addEventListener('scroll', markScroll, { passive: true });
+new ResizeObserver(markScroll).observe(controlsEl);
+
 // window resizes fire in bursts; re-cut the pieces at most once per frame
 let resizeQueued = false;
 new ResizeObserver(() => {
@@ -1437,6 +1448,15 @@ if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
   window.mjDebug = {
     pieces: () => byId.map(p => ({ id: p.id, x: +p.x.toFixed(3), y: +p.y.toFixed(3), locked: p.locked, heldBy: p.heldBy || null })),
     peers: () => peersList.map(p => ({ peer: p.peer, you: p.sameTab, name: p.presence && p.presence.name, drag: p.presence && p.presence.drag })),
+    // where the table, board and loose pieces are, in CSS pixels within the canvas
+    layout: () => {
+      const sz = (1 + 2 * PAD) * s;
+      return {
+        W, H, s, topInset, board: Object.assign({}, board),
+        loose: pieces.filter(p => !p.locked).map(p => [board.x + p.x * s - PAD * s, board.y + p.y * s - PAD * s, sz, sz]),
+        pieceCount: pieces.length
+      };
+    },
     // translation keys each language lacks compared with English (should all be empty)
     missingKeys: () => missingKeys(),
     // painting ids whose translated texts are missing a field or story paragraph

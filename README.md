@@ -29,7 +29,8 @@ Run `npm run setup:vscode` once. It copies the launch, task and settings files f
 | `npm start` | Serve the game and the local multiplayer relay on port 4317 (`npm start -- 5000` for another port) |
 | `npm run dev` | Same, restarting the server when `server.js` changes |
 | `npm test` | Server tests with Node's built-in runner, no install needed |
-| `npm run test:e2e` | Browser tests with two players at one table (see below) |
+| `npm run test:e2e` | All browser tests: multiplayer, languages, and every screen size (see below) |
+| `npm run test:screens` | Just the screen-size tests |
 | `npm run setup:vscode` | Copy the VS Code launch, task and settings files into `.vscode/` (run once) |
 | `npm run build` | Build `dist/masterpiece-jigsaw.html`, the single-file page published on claude.ai |
 
@@ -41,7 +42,21 @@ npx playwright install chromium   # first time only
 npm run test:e2e
 ```
 
-They start their own server on port 4399 and cover joining by link, the leader removing a player who then can't rejoin, and only the leader choosing the painting. Set `MJ_CHROME` to an installed Chrome's path to use it instead of Playwright's browser.
+They start their own server on port 4399 and run in parallel. Set `MJ_CHROME` to an installed Chrome's path to use it instead of Playwright's browser.
+
+- **`two-players.spec.js`**: joining by link, leading, removing a player, switching and finishing paintings.
+- **`supabase-shim.spec.js`**: the website's multiplayer, against a stand-in for supabase-js.
+- **`languages.spec.js`**: every language has every string and painting text, switching mid-game, plurals, a mixed-language table.
+- **`screens.spec.js`**: nine screen sizes, from a 320 px phone and a landscape phone to a 1920 px desktop. Each walks the menu, the invite popup, the table on Hard, every card and the finished-painting bar, in all six languages. It fails on:
+  - sideways scrolling, or controls off the edge;
+  - cut-off or overlapping buttons;
+  - cards that don't fit, or main buttons out of reach or covered;
+  - controls under 40 px on touch screens;
+  - a header taking too much of the screen, pieces under 16 px, or pieces outside the table.
+
+  It also checks that touch-dragging works and never scrolls the page.
+
+The screen tests measure text in the game's real typefaces. `tests/e2e/local-fonts.js` serves them from the `@fontsource` dev dependencies in place of Google Fonts, so the results don't depend on internet access. The Japanese families are large (about 90 MB), but they're only used by the tests and never reach the website.
 
 ## Project layout
 
@@ -51,7 +66,9 @@ public/
   index.html              markup: header, table, main menu and cards
   styles.css              design tokens (light and dark) and layout
   game.js                 puzzle, drawing, input, menu and table sync
-  paintings.js            the collection and the stories
+  paintings.js            the collection and the stories (English)
+  i18n.js                 English interface text, language switching, plurals, fonts
+  locales/<lang>.js       one file per language: interface text, fonts, painting texts
   shim-local-room.js      local stand-in for claude.ai's room service (talks to server.js)
   shim-supabase-room.js   the same room API over Supabase Realtime, for the public website
   config.js               Supabase project URL and publishable key
@@ -99,7 +116,17 @@ The leader is whoever started the table. If they leave, the earliest remaining p
 
 1. Put a JPEG at `public/images/<id>.jpg`, around 680px on the long side.
 2. Add an entry with the same `id` to `public/paintings.js`.
-3. Use public-domain works only.
+3. Add its title, artist, dates, medium, museum and story to `paintings` in each `public/locales/*.js`. `npm run test:e2e` fails until every language has it.
+4. Use public-domain works only.
+
+## Languages
+
+English, French, German, Italian, Russian and Japanese. The dropdown in the header switches instantly, even mid-puzzle, and remembers the choice. A first visit follows the browser's language. Each player at a shared table sees their own language.
+
+- Every visible string is looked up by key with `t('menu.start')`. In the markup, `data-i18n`, `data-i18n-placeholder`, `data-i18n-title` and `data-i18n-label` mark text, placeholders, tooltips and screen-reader labels.
+- Values can hold `{placeholders}`. A value can also be plural forms, `{ one, few, many, other }`, chosen by `Intl.PluralRules` for that language.
+- Russian and Japanese bring their own typefaces, because the default fonts don't cover their scripts.
+- **Adding a language:** copy a file in `public/locales/`, translate it, then add it to `LOCALES` in `i18n.js` and to `MODULES` in `scripts/build-artifact.js`. Anything missing falls back to English.
 
 ## Publishing changes to claude.ai
 

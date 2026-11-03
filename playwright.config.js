@@ -3,6 +3,8 @@ const { defineConfig } = require('@playwright/test');
 module.exports = defineConfig({
   testDir: 'tests/e2e',
   timeout: 30000,
+  // the screen-size tests are independent; run them side by side on all cores
+  fullyParallel: true,
   use: {
     baseURL: 'http://localhost:4399',
     viewport: { width: 1280, height: 800 },

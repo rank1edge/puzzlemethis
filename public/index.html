@@ -21,18 +21,18 @@
     <h1 id="artTitle">Masterpiece Jigsaw</h1>
     <p id="artMeta">Sixteen famous paintings to piece together</p>
   </div>
-  <div class="stats" aria-live="polite">
+  <div class="stats game-only" aria-live="polite">
     <span class="level" id="levelTag">Main menu</span>
     <span><span data-i18n="stats.round">Round</span> <b id="round">0</b></span>
     <span><b id="placed">0</b> / <span id="total">0</span> <span data-i18n="stats.placed">placed</span></span>
     <span id="clock">0:00</span>
   </div>
-  <div class="controls">
-    <button class="btn" id="menuBtn" disabled data-i18n="btn.menu" data-i18n-title="btn.menu.title">← Main menu</button>
-    <button class="btn" id="storyBtn" disabled data-i18n="btn.story">Story</button>
-    <button class="btn" id="galleryBtn" disabled data-i18n="btn.gallery">Paintings</button>
-    <button class="btn" id="ghostBtn" aria-pressed="true" data-i18n="btn.guide" data-i18n-title="btn.guide.title">Guide</button>
-    <button class="btn" id="tidyBtn" data-i18n="btn.tidy" data-i18n-title="btn.tidy.title">Tidy</button>
+  <div class="controls" id="controls">
+    <button class="btn game-only" id="menuBtn" disabled data-i18n="btn.menu" data-i18n-title="btn.menu.title">← Main menu</button>
+    <button class="btn game-only" id="storyBtn" disabled data-i18n="btn.story">Story</button>
+    <button class="btn game-only" id="galleryBtn" disabled data-i18n="btn.gallery">Paintings</button>
+    <button class="btn game-only" id="ghostBtn" aria-pressed="true" data-i18n="btn.guide" data-i18n-title="btn.guide.title">Guide</button>
+    <button class="btn game-only" id="tidyBtn" data-i18n="btn.tidy" data-i18n-title="btn.tidy.title">Tidy</button>
     <button class="btn" id="soundBtn" aria-pressed="true" data-i18n="btn.sound">Sound</button>
     <label class="lang" for="langSelect"><svg class="lang-icon" aria-hidden="true" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.3"/><path d="M1.7 8h12.6M8 1.7c-2 2.3-2 10.3 0 12.6M8 1.7c2 2.3 2 10.3 0 12.6"/></svg><span class="sr" data-i18n="lang.label">Language</span>
       <select id="langSelect"></select>

@@ -1,7 +1,7 @@
 // Builds the single-file page published on claude.ai from public/.
 //   npm run build   ->  dist/masterpiece-jigsaw.html
 //
-// It inlines styles.css and the game's modules (i18n.js, paintings*.js, game.js)
+// It inlines styles.css and the game's modules (locales/*.js, i18n.js, paintings.js, game.js)
 // into one script, embeds every image as a
 // data URI, drops the local multiplayer shim (claude.ai provides the real
 // room service), and writes only the page content, because claude.ai adds
@@ -20,7 +20,8 @@ const html = read('index.html');
 const css = read('styles.css');
 // modules in dependency order; their import lines are dropped and their exports
 // become plain declarations inside one shared scope
-const MODULES = ['i18n.js', 'paintings.js', 'paintings.ru.js', 'game.js'];
+const MODULES = ['locales/fr.js', 'locales/it.js', 'locales/de.js', 'locales/ru.js', 'locales/ja.js',
+  'i18n.js', 'paintings.js', 'game.js'];
 const unmodule = src => src.replace(/^import [^\n]*;\n/gm, '').replace(/^export (const|let|function|async function|class) /gm, '$1 ');
 const paintings = read('paintings.js');
 const game = MODULES.map(f => '// ---- ' + f + '\n' + unmodule(read(f))).join('\n');
