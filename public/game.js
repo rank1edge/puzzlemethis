@@ -3,12 +3,23 @@
 // or shim-local-room.js talking to server.js when run locally.
 
 import { PAINTINGS } from './paintings.js';
+import { PAINTINGS_RU } from './paintings.ru.js';
+import { LANGUAGES, t, setLang, currentLang, pickInitialLang, translatePage, missingKeys } from './i18n.js';
 
 (() => {
+// `t` is used for local variables below, so the translation lookup goes by `tr`
+const tr = t;
 // Image sources: files in images/ when served, or data URIs baked in by `npm run build`.
 const IMAGES = window.MJ_IMAGES || Object.fromEntries(PAINTINGS.map(p => [p.id, { src: 'images/' + p.id + '.jpg' }]));
 
 const BY_ID = Object.fromEntries(PAINTINGS.map(p => [p.id, p]));
+// A painting's title, artist, dates, medium, museum and story in the current
+// language, falling back to English for anything not translated.
+const PAINTING_TEXT = { ru: PAINTINGS_RU };
+function P(pt) {
+  const loc = PAINTING_TEXT[currentLang()];
+  return loc && loc[pt.id] ? Object.assign({}, pt, loc[pt.id]) : pt;
+}
 
 const LEVELS = {
   easy:   { key: 'easy',   name: 'Easy',   target: 16 },
@@ -215,7 +226,8 @@ function readColors() {
     edge: cs.getPropertyValue('--slot-edge').trim(),
     varnish: cs.getPropertyValue('--varnish').trim(),
     panel: cs.getPropertyValue('--panel').trim(),
-    ink: cs.getPropertyValue('--ink').trim()
+    ink: cs.getPropertyValue('--ink').trim(),
+    font: cs.getPropertyValue('--body').trim() || 'system-ui, sans-serif'
   };
 }
 
@@ -403,7 +415,7 @@ function friendCursors() {
     if (!c || pr.presence.rd !== round) continue;
     const cx = board.x + c.x * s, cy = board.y + c.y * s;
     if (cx < -20 || cy < -20 || cx > W + 20 || cy > H + 20) continue;
-    out.push({ peer: pr.peer, cx, cy, col: colorAt(pr.presence.c), nm: cleanName(pr.presence.name) || 'Friend' });
+    out.push({ peer: pr.peer, cx, cy, col: colorAt(pr.presence.c), nm: cleanName(pr.presence.name) || tr('players.friend') });
   }
   return out;
 }
@@ -500,7 +512,7 @@ function draw(now = performance.now()) {
   }
 
   // friends' pointers, each in their avatar colour with their name
-  if (cursors.length) ctx.font = '600 11px Karla, system-ui, sans-serif';
+  if (cursors.length) ctx.font = '600 11px ' + colors.font;
   for (const c of cursors) {
     ctx.beginPath(); ctx.arc(c.cx, c.cy, 6, 0, Math.PI * 2);
     ctx.fillStyle = c.col; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
@@ -629,11 +641,11 @@ function askExit() {
   if (!others && (placed === 0 || done)) { exitToMenu(); return; }
   closeCards();
   const parts = [];
-  if (placed && !done) parts.push((others ? 'Your table has' : 'You\u2019ve') + ' placed ' + placed + ' of ' + pieces.length + ' pieces of ' + art.title + '.');
-  if (others) parts.push((others === 1 ? 'Your friend keeps' : 'Your ' + others + ' friends keep') + ' playing' +
-    (amHost() ? ', and the next person takes over as leader.' : ' without you.') +
-    ' You can rejoin with the table code ' + tableCode.toUpperCase() + '.');
-  else parts.push('Your puzzle won\u2019t be saved.');
+  if (placed && !done) parts.push(tr(others ? 'progress.table' : 'progress.you', { placed, n: pieces.length, title: P(art).title }));
+  if (others) {
+    parts.push(tr(amHost() ? (others === 1 ? 'exit.friendLeads' : 'exit.friendsLead') : (others === 1 ? 'exit.friend' : 'exit.friends'), { n: others }));
+    parts.push(tr('exit.rejoin', { code: tableCode.toUpperCase() }));
+  } else parts.push(tr('exit.notSaved'));
   $('exitNote').textContent = parts.join(' ');
   $('exitCard').classList.add('show');
   $('exitStay').focus({ preventScroll: true });
@@ -655,15 +667,15 @@ function pickPainting(pt) {
   switchTarget = pt;
   const same = pt === art;
   const others = visible().filter(p => !p.sameTab).length;
-  $('switchTitle').textContent = same ? 'Start ' + art.title + ' again?' : 'Start ' + pt.title + '?';
+  const cur = P(art).title, next = P(pt).title;
+  $('switchTitle').textContent = tr(same ? 'switch.titleSame' : 'switch.titleNew', { title: same ? cur : next });
   $('switchNote').textContent =
-    (others ? 'Your table has' : 'You\u2019ve') + ' placed ' + placed + ' of ' + pieces.length + ' pieces of ' + art.title + '. ' +
-    (same ? 'Starting again mixes them all up' : 'Starting a new painting clears them') +
-    (others ? ' for everyone at the table.' : '.');
+    tr(others ? 'progress.table' : 'progress.you', { placed, n: pieces.length, title: cur }) + ' ' +
+    tr(same ? (others ? 'switch.mixesTable' : 'switch.mixes') : (others ? 'switch.clearsTable' : 'switch.clears'));
   $('switchFrom').style.backgroundImage = 'url(' + IMAGES[art.id].src + ')';
   $('switchTo').style.backgroundImage = 'url(' + IMAGES[pt.id].src + ')';
-  $('switchKeep').textContent = 'Keep playing ' + art.title;
-  $('switchGo').textContent = same ? 'Start again' : 'Start ' + pt.title;
+  $('switchKeep').textContent = tr('switch.keep', { title: cur });
+  $('switchGo').textContent = same ? tr('switch.again') : tr('switch.go', { title: next });
   $('switchCard').classList.add('show');
   $('switchKeep').focus({ preventScroll: true });
 }
@@ -679,28 +691,31 @@ function updateAfter() {
   bar.hidden = !show;
   if (!show) return;
   const lead = amHost() && !spectator;
-  $('afterTitle').textContent = art.title;
+  $('afterTitle').textContent = P(art).title;
   $('afterNext').hidden = !lead;
   $('afterWait').hidden = lead;
-  $('afterWait').textContent = 'Waiting for ' + leaderName() + ' to choose the next painting';
+  $('afterWait').textContent = tr('after.wait', { name: leaderName() });
   // below the board when there's room, otherwise over its bottom edge
   const h = bar.offsetHeight || 46;
   bar.style.top = Math.max(M, Math.min(board.y + board.h + 14, H - h - 12)) + 'px';
 }
+let infoComplete = false;
 function showInfo(complete) {
   closeCards();
-  $('infoEyebrow').textContent = complete ? 'Round ' + round + ' complete' : 'The story';
-  $('infoTitle').textContent = art.title;
-  $('iArtist').textContent = art.artist;
-  $('iYear').textContent = art.year;
-  $('iMedium').textContent = art.medium;
-  $('iHome').textContent = art.home;
+  infoComplete = complete;
+  const a = P(art);
+  $('infoEyebrow').textContent = complete ? tr('info.roundDone', { n: round }) : tr('info.story');
+  $('infoTitle').textContent = a.title;
+  $('iArtist').textContent = a.artist;
+  $('iYear').textContent = a.year;
+  $('iMedium').textContent = a.medium;
+  $('iHome').textContent = a.home;
   ['iTimeL', 'iTime', 'iLevelL', 'iLevel'].forEach(id => { $(id).hidden = !complete; });
-  $('iTimeL').textContent = table && peersList.length > 1 ? 'Table time' : 'Your time';
+  $('iTimeL').textContent = tr(table && peersList.length > 1 ? 'info.tableTime' : 'info.yourTime');
   $('iTime').textContent = fmt(elapsed);
-  $('iLevel').textContent = level ? level.name + ' · ' + pieces.length + ' pieces' : '';
+  $('iLevel').textContent = level ? tr('info.levelValue', { level: tr('level.' + level.key), n: pieces.length }) : '';
   const st = $('iStory'); st.textContent = '';
-  art.story.forEach(t => { const p = document.createElement('p'); p.textContent = t; st.appendChild(p); });
+  a.story.forEach(t => { const p = document.createElement('p'); p.textContent = t; st.appendChild(p); });
   $('doneRow').hidden = true; $('waitNote').hidden = true;
   if (complete) leaderButtons();
   $('infoCard').scrollTop = 0;
@@ -717,9 +732,10 @@ function buildGallery() {
     b.disabled = spectator || !amHost();
     const ph = document.createElement('span'); ph.className = 'pic';
     ph.style.backgroundImage = 'url(' + IMAGES[pt.id].src + ')';
-    if (finished.has(pt.id)) { const d = document.createElement('span'); d.className = 'done'; d.textContent = 'Solved'; ph.appendChild(d); }
-    const t = document.createElement('b'); t.textContent = pt.title;
-    const a = document.createElement('small'); a.textContent = pt.artist + ', ' + pt.year;
+    if (finished.has(pt.id)) { const d = document.createElement('span'); d.className = 'done'; d.textContent = tr('gal.solved'); ph.appendChild(d); }
+    const loc = P(pt);
+    const t = document.createElement('b'); t.textContent = loc.title;
+    const a = document.createElement('small'); a.textContent = loc.artist + ', ' + loc.year;
     b.append(ph, t, a);
     b.addEventListener('click', () => pickPainting(pt));
     grid.appendChild(b);
@@ -727,9 +743,7 @@ function buildGallery() {
 }
 function showGallery() {
   closeCards(); buildGallery();
-  $('galNote').textContent = amHost()
-    ? 'Your current puzzle is set aside and the one you pick starts as a new round at the same level, for everyone at the table.'
-    : 'Only ' + leaderName() + ', the table leader, can choose the painting. You can browse the collection here.';
+  $('galNote').textContent = amHost() ? tr('gal.note') : tr('gal.noteFollower', { name: leaderName() });
   $('galleryCard').scrollTop = 0; $('galleryCard').classList.add('show'); $('galClose').focus({ preventScroll: true }); }
 function showInvite() {
   closeCards();
@@ -779,7 +793,7 @@ const myPeer = () => { const m = myEntry(); return m ? m.peer : ''; };
 function leaderName() {
   const L = leader();
   if (!L || L.sameTab) return me.name;
-  return cleanName(L.presence && L.presence.name) || 'The leader';
+  return cleanName(L.presence && L.presence.name) || tr('leader.fallback');
 }
 function bans() {
   const L = leader();
@@ -800,7 +814,7 @@ function renderPlayers() {
   if (table && peersList.length) {
     list = visible().map(p => ({
       peer: p.peer,
-      name: p.sameTab ? me.name : (cleanName(p.presence && p.presence.name) || 'Friend'),
+      name: p.sameTab ? me.name : (cleanName(p.presence && p.presence.name) || tr('players.friend')),
       color: p.sameTab ? me.color : (p.presence && p.presence.c),
       you: p.sameTab, lead: !!lead && p.peer === lead.peer, guest: p.guest
     }));
@@ -811,19 +825,19 @@ function renderPlayers() {
     // the leader can tap a friend's chip to remove them
     const canKick = iLead && table && !pl.you;
     const chip = document.createElement(canKick ? 'button' : 'span'); chip.className = 'chip';
-    if (canKick) { chip.title = 'Remove ' + pl.name + ' from the table'; chip.addEventListener('click', () => showKick(pl.peer)); }
+    if (canKick) { chip.title = tr('players.remove', { name: pl.name }); chip.addEventListener('click', () => showKick(pl.peer)); }
     const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = pl.name;
     chip.append(avatarEl(pl.name, pl.color), nm);
-    const tags = [pl.lead && list.length > 1 && 'leader', pl.you && 'you', pl.guest && 'guest'].filter(Boolean);
+    const tags = [pl.lead && list.length > 1 && tr('players.leader'), pl.you && tr('players.you'), pl.guest && tr('players.guest')].filter(Boolean);
     if (tags.length) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = tags.join(' · '); chip.appendChild(t); }
     if (canKick) { const x = document.createElement('span'); x.className = 'x'; x.setAttribute('aria-hidden', 'true'); x.textContent = '×'; chip.appendChild(x); }
     el.appendChild(chip);
   });
   if (list.length > MAX) { const more = document.createElement('span'); more.className = 'chip'; more.textContent = '+' + (list.length - MAX); el.appendChild(more); }
-  const inv = document.createElement('button'); inv.className = 'btn primary'; inv.id = 'inviteBtn'; inv.textContent = 'Invite friends';
+  const inv = document.createElement('button'); inv.className = 'btn primary'; inv.id = 'inviteBtn'; inv.textContent = tr('players.invite');
   inv.addEventListener('click', showInvite);
   el.appendChild(inv);
-  if (spectator) { const w = document.createElement('span'); w.className = 'watch'; w.textContent = 'Watching only: you need edit access to move pieces'; el.appendChild(w); }
+  if (spectator) { const w = document.createElement('span'); w.className = 'watch'; w.textContent = tr('players.watching'); el.appendChild(w); }
   if (el.offsetHeight !== before) { layout(); }
   request();
   if ($('inviteCard').classList.contains('show')) inviteCount();
@@ -832,7 +846,7 @@ function renderPlayers() {
 }
 function inviteCount() {
   const n = visible().length;
-  $('invCount').textContent = n > 1 ? n + ' people are at this table now.' : 'Nobody else is here yet.';
+  $('invCount').textContent = n > 1 ? tr('inv.count', { n }) : tr('inv.alone');
 }
 function leaderButtons() {
   // everyone can admire the finished painting; only the leader picks the next one
@@ -840,7 +854,7 @@ function leaderButtons() {
   $('doneRow').hidden = false;
   $('nextBtn').hidden = !lead;
   $('waitNote').hidden = lead;
-  $('waitNote').textContent = 'Waiting for ' + leaderName() + ' to choose the next painting.';
+  $('waitNote').textContent = tr('info.wait', { name: leaderName() });
 }
 
 /* ---------- removing a player (leader only) ---------- */
@@ -850,8 +864,8 @@ function showKick(peer) {
   if (!p || !amHost()) return;
   closeCards();
   kickTarget = peer;
-  const nm = cleanName(p.presence && p.presence.name) || 'this player';
-  $('kickTitle').textContent = 'Remove ' + nm + '?';
+  const nm = cleanName(p.presence && p.presence.name) || tr('kick.thisPlayer');
+  $('kickTitle').textContent = tr('kick.title', { name: nm });
   const a = $('kickAvatar'); a.style.background = colorAt(p.presence && p.presence.c); a.textContent = nm.slice(0, 1);
   $('kickCard').classList.add('show');
   $('kickNo').focus({ preventScroll: true });
@@ -873,7 +887,7 @@ function beKicked() {
   const who = leaderName();
   leaveTable().then(() => {
     kickedOut = false;
-    resetToMenu(who + ' removed you from the table.');
+    resetToMenu(tr('msg.removed', { name: who }));
   });
 }
 function checkBanned() {
@@ -1090,8 +1104,9 @@ function peekNextPainting() {
 }
 function nextPainting() { peekNextPainting(); return queue.shift(); }
 function updatePlaque() {
-  $('artTitle').textContent = art.title;
-  $('artMeta').textContent = art.artist + ' · ' + art.year;
+  const a = P(art);
+  $('artTitle').textContent = a.title;
+  $('artMeta').textContent = a.artist + ' · ' + a.year;
 }
 // Deal a new round here and send it to everyone at the table.
 function startRound(pt) {
@@ -1116,9 +1131,9 @@ function startRound(pt) {
 }
 function setLevel(lv) {
   level = lv;
-  $('levelTag').textContent = level.name;
+  $('levelTag').textContent = tr('level.' + level.key);
   const g = $('ghostBtn');
-  if (level.blur) { g.disabled = true; g.setAttribute('aria-pressed', 'false'); g.title = 'Hard level always uses the blurred board'; }
+  if (level.blur) { g.disabled = true; g.setAttribute('aria-pressed', 'false'); g.title = tr('btn.guide.hardTitle'); }
 }
 function enterGame() {
   preloadPaintings();
@@ -1145,7 +1160,7 @@ function refreshMe() {
 }
 function needName() {
   me.name = cleanName($('nameInput').value);
-  if (!me.name) { setMenuMsg('Type your name first, so friends know who you are.'); $(popOpen() ? 'popName' : 'nameInput').focus(); return false; }
+  if (!me.name) { setMenuMsg(tr('msg.needName')); $(popOpen() ? 'popName' : 'nameInput').focus(); return false; }
   store.set('mj.name', me.name); store.set('mj.color', String(me.color));
   return true;
 }
@@ -1153,7 +1168,7 @@ function busy(on) { $('startBtn').disabled = on; $('joinBtn').disabled = on; $('
 
 async function onStart() {
   if (!needName()) return;
-  busy(true); setMenuMsg('Setting the table…');
+  busy(true); setMenuMsg(tr('msg.setting'));
   setLevel(LEVELS[pickedLevel]);
   const code = newCode();
   await openTable(code, true);
@@ -1164,10 +1179,10 @@ async function onStart() {
 async function onJoin() {
   if (!needName()) return;
   const code = $('codeInput').value.toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (code.length !== 5) { setMenuMsg('A table code has 5 letters and numbers.'); $(popOpen() ? 'popCode' : 'codeInput').focus(); return; }
-  busy(true); setMenuMsg('Looking for table ' + code.toUpperCase() + '…');
+  if (code.length !== 5) { setMenuMsg(tr('msg.codeLength')); $(popOpen() ? 'popCode' : 'codeInput').focus(); return; }
+  busy(true); setMenuMsg(tr('msg.looking', { code: code.toUpperCase() }));
   const ok = await openTable(code, false);
-  if (!ok) { busy(false); setMenuMsg("Tables can't connect in this view. You can still start your own table and play alone."); return; }
+  if (!ok) { busy(false); setMenuMsg(tr('msg.noRooms')); return; }
   const got = await new Promise(resolve => {
     const j = { resolve: () => resolve(true), banned: () => resolve('banned'), timers: [] };
     joining = j;
@@ -1181,8 +1196,8 @@ async function onJoin() {
     clearHash();
     busy(false);
     setMenuMsg(got === 'banned'
-      ? who + ' removed you from table ' + code.toUpperCase() + ', so you can\'t rejoin it.'
-      : 'Nobody is at table ' + code.toUpperCase() + ' right now. Check the code with your friend, or start your own table.');
+      ? tr('msg.banned', { name: who, code: code.toUpperCase() })
+      : tr('msg.nobody', { code: code.toUpperCase() }));
     return;
   }
   setMenuMsg('');
@@ -1194,7 +1209,7 @@ async function onJoin() {
 // Someone who opens an invite link sees this over the main menu, with the code
 // filled in, so they join their friend instead of starting a new table by mistake.
 function openInvitePop(code) {
-  $('popTitle').textContent = 'Join table ' + code.toUpperCase();
+  $('popTitle').textContent = tr('pop.title', { code: code.toUpperCase() });
   $('popCode').value = code.toUpperCase();
   $('popName').value = me.name;
   $('popMsg').textContent = '';
@@ -1226,7 +1241,7 @@ function setMenuMode(mode, code) {
   $('ownTableBtn').hidden = !inv;
   $('joinNote').hidden = inv;
   $('joinBtn').classList.toggle('primary', inv);
-  if (inv) $('bannerTitle').textContent = 'You’re invited to table ' + String(code || '').toUpperCase();
+  if (inv) $('bannerTitle').textContent = tr('menu.banner.title', { code: String(code || '').toUpperCase() });
 }
 // Back to the main menu, e.g. after the leader removes you.
 function resetToMenu(msg) {
@@ -1239,9 +1254,9 @@ function resetToMenu(msg) {
   $('menu').classList.remove('gone');
   $('storyBtn').disabled = true; $('galleryBtn').disabled = true; $('menuBtn').disabled = true;
   const g = $('ghostBtn'); g.disabled = false; g.setAttribute('aria-pressed', String(ghost));
-  g.title = 'Show a faint copy of the painting on the board. When off, the board shows a soft blur.';
-  $('levelTag').textContent = 'Main menu'; $('round').textContent = '0';
-  $('artTitle').textContent = 'Masterpiece Jigsaw'; $('artMeta').textContent = 'Sixteen famous paintings to piece together';
+  g.title = tr('btn.guide.title');
+  $('round').textContent = '0';
+  menuHeader();
   $('hint').classList.add('gone');
   clearHash(); $('codeInput').value = '';
   $('invitePop').hidden = true;
@@ -1258,12 +1273,16 @@ function showMenuArt(i) {
   img.src = IMAGES[pt.id].src;
   img.style.opacity = '1'; $(artFront).style.opacity = '0';
   artFront = back;
-  const lab = $('artLabel'); lab.textContent = '';
-  const b = document.createElement('b'); b.textContent = pt.title;
-  lab.append(b, document.createTextNode(pt.artist + ', ' + pt.year));
+  artLabel(pt);
+}
+function artLabel(pt) {
+  const loc = P(pt), lab = $('artLabel'); lab.textContent = '';
+  const b = document.createElement('b'); b.textContent = loc.title;
+  lab.append(b, document.createTextNode(loc.artist + ', ' + loc.year));
 }
 function startMenuArt() {
   clearInterval(artTimer);
+  artIdx = 0; artLabel(PAINTINGS[0]);
   $('artA').src = IMAGES['mona-lisa'].src; $('artA').style.opacity = '1';
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   artTimer = setInterval(() => { artIdx = (artIdx + 1) % PAINTINGS.length; showMenuArt(artIdx); }, 5200);
@@ -1275,7 +1294,7 @@ function setupMenu() {
   AVATAR_COLORS.forEach((c, i) => {
     const b = document.createElement('button');
     b.className = 'sw'; b.id = 'sw' + i; b.dataset.c = i; b.style.background = c;
-    b.setAttribute('role', 'radio'); b.setAttribute('aria-label', 'Colour ' + (i + 1));
+    b.setAttribute('role', 'radio'); b.setAttribute('aria-label', tr('menu.colour', { n: i + 1 }));
     b.addEventListener('click', () => { me.color = i; refreshMe(); });
     sw.appendChild(b);
   });
@@ -1308,6 +1327,52 @@ function setupMenu() {
   else (me.name ? $('startBtn') : $('nameInput')).focus({ preventScroll: true });
 }
 
+/* ---------- language ---------- */
+// The header while no table is open: the game's name and tagline.
+function menuHeader() {
+  $('artTitle').textContent = 'Masterpiece Jigsaw';
+  $('artMeta').textContent = tr('app.tagline');
+  $('levelTag').textContent = tr('stats.mainMenu');
+}
+// Re-label everything on screen after the language changes, without
+// interrupting a puzzle: open cards are rebuilt in place.
+function relabel() {
+  translatePage();
+  document.querySelectorAll('[data-claude-only]').forEach(el => { el.hidden = !IN_CLAUDE; });
+  document.querySelectorAll('.sw').forEach((b, i) => b.setAttribute('aria-label', tr('menu.colour', { n: i + 1 })));
+  readColors();
+  if (level) {
+    updatePlaque();
+    $('levelTag').textContent = tr('level.' + level.key);
+    if (level.blur) $('ghostBtn').title = tr('btn.guide.hardTitle');
+  } else menuHeader();
+  artLabel(PAINTINGS[artIdx] || PAINTINGS[0]);
+  if (!$('invitePop').hidden) $('popTitle').textContent = tr('pop.title', { code: $('popCode').value.toUpperCase() });
+  if (!$('inviteBanner').hidden) $('bannerTitle').textContent = tr('menu.banner.title', { code: $('codeInput').value.toUpperCase() });
+  $('menuMsg').textContent = ''; $('popMsg').textContent = ''; $('copyMsg').textContent = '';
+  if (!$('players').hidden) renderPlayers();
+  const open = CARDS.find(id => $(id).classList.contains('show'));
+  if (open === 'infoCard') showInfo(infoComplete);
+  else if (open === 'galleryCard') showGallery();
+  else if (open === 'inviteCard') showInvite();
+  else if (open === 'switchCard' && switchTarget) pickPainting(switchTarget);
+  else if (open === 'exitCard') askExit();
+  else if (open === 'kickCard' && kickTarget) showKick(kickTarget);
+  updateAfter();
+  fullRedraw = true; request();               // friends' name tags use the new font
+}
+function setupLanguages() {
+  const sel = $('langSelect');
+  LANGUAGES.forEach(l => { const o = document.createElement('option'); o.value = l.code; o.textContent = l.name; o.lang = l.code; sel.appendChild(o); });
+  setLang(pickInitialLang(store.get('mj.lang')));
+  sel.value = currentLang();
+  sel.addEventListener('change', () => {
+    setLang(sel.value);
+    store.set('mj.lang', currentLang());
+    relabel();
+  });
+}
+
 /* ---------- controls ---------- */
 $('ghostBtn').addEventListener('click', e => { ghost = !ghost; e.currentTarget.setAttribute('aria-pressed', String(ghost)); request(); });
 $('soundBtn').addEventListener('click', e => { sound = !sound; e.currentTarget.setAttribute('aria-pressed', String(sound)); });
@@ -1333,13 +1398,13 @@ function copyText(text, okMsg) {
     $('invCode').textContent = text;
     const r = document.createRange(); r.selectNodeContents($('invCode'));
     const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-    $('copyMsg').textContent = 'Selected. Copy it to send.';
+    $('copyMsg').textContent = tr('inv.selected');
     setTimeout(() => { $('invCode').textContent = tableCode.toUpperCase(); }, 6000);
   };
   try { navigator.clipboard.writeText(text).then(() => { $('copyMsg').textContent = okMsg; }, fallback); } catch (e) { fallback(); }
 }
-$('copyLink').addEventListener('click', () => copyText(tableLink(), 'Link copied'));
-$('copyCode').addEventListener('click', () => copyText(tableCode.toUpperCase(), 'Code copied'));
+$('copyLink').addEventListener('click', () => copyText(tableLink(), tr('inv.linkCopied')));
+$('copyCode').addEventListener('click', () => copyText(tableCode.toUpperCase(), tr('inv.codeCopied')));
 $('kickYes').addEventListener('click', doKick);
 $('kickNo').addEventListener('click', closeCards);
 $('switchKeep').addEventListener('click', () => { switchTarget = null; closeCards(); });
@@ -1372,6 +1437,11 @@ if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
   window.mjDebug = {
     pieces: () => byId.map(p => ({ id: p.id, x: +p.x.toFixed(3), y: +p.y.toFixed(3), locked: p.locked, heldBy: p.heldBy || null })),
     peers: () => peersList.map(p => ({ peer: p.peer, you: p.sameTab, name: p.presence && p.presence.name, drag: p.presence && p.presence.drag })),
+    // translation keys each language lacks compared with English (should all be empty)
+    missingKeys: () => missingKeys(),
+    // painting ids whose translated texts are missing a field or story paragraph
+    missingPaintingText: () => Object.fromEntries(Object.entries(PAINTING_TEXT).map(([code, texts]) => [code,
+      PAINTINGS.filter(pt => { const x = texts[pt.id]; return !x || ['title', 'artist', 'year', 'medium', 'home'].some(k => !x[k]) || !x.story || x.story.length !== pt.story.length; }).map(pt => pt.id)])),
     // settle one loose piece as if it had been dragged home (for tests)
     placeOne: () => { const p = byId.find(q => !q.locked); if (!p) return false; lockPiece(p); emitT('lock', { r: round, i: p.id }); return true; },
     // time one full redraw of the moving-pieces layer (a normal frame repaints far less)
@@ -1379,8 +1449,10 @@ if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
   };
 }
 
+setupLanguages();
 readColors();
 setupMenu();
+relabel();
 loadImage('mona-lisa').then(im => {
   if (pic) return;
   art = PAINTINGS[0]; COLS = 4; ROWS = 4; pic = cropTo(im, 4, 4);

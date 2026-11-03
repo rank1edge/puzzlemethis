@@ -23,31 +23,34 @@
   </div>
   <div class="stats" aria-live="polite">
     <span class="level" id="levelTag">Main menu</span>
-    <span>Round <b id="round">0</b></span>
-    <span><b id="placed">0</b> / <span id="total">0</span> placed</span>
+    <span><span data-i18n="stats.round">Round</span> <b id="round">0</b></span>
+    <span><b id="placed">0</b> / <span id="total">0</span> <span data-i18n="stats.placed">placed</span></span>
     <span id="clock">0:00</span>
   </div>
   <div class="controls">
-    <button class="btn" id="menuBtn" disabled title="Leave this table and go back to the main menu">← Main menu</button>
-    <button class="btn" id="storyBtn" disabled>Story</button>
-    <button class="btn" id="galleryBtn" disabled>Paintings</button>
-    <button class="btn" id="ghostBtn" aria-pressed="true" title="Show a faint copy of the painting on the board. When off, the board shows a soft blur.">Guide</button>
-    <button class="btn" id="tidyBtn" title="Spread the loose pieces around the board again">Tidy</button>
-    <button class="btn" id="soundBtn" aria-pressed="true">Sound</button>
+    <button class="btn" id="menuBtn" disabled data-i18n="btn.menu" data-i18n-title="btn.menu.title">← Main menu</button>
+    <button class="btn" id="storyBtn" disabled data-i18n="btn.story">Story</button>
+    <button class="btn" id="galleryBtn" disabled data-i18n="btn.gallery">Paintings</button>
+    <button class="btn" id="ghostBtn" aria-pressed="true" data-i18n="btn.guide" data-i18n-title="btn.guide.title">Guide</button>
+    <button class="btn" id="tidyBtn" data-i18n="btn.tidy" data-i18n-title="btn.tidy.title">Tidy</button>
+    <button class="btn" id="soundBtn" aria-pressed="true" data-i18n="btn.sound">Sound</button>
+    <label class="lang" for="langSelect"><svg class="lang-icon" aria-hidden="true" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.3"/><path d="M1.7 8h12.6M8 1.7c-2 2.3-2 10.3 0 12.6M8 1.7c2 2.3 2 10.3 0 12.6"/></svg><span class="sr" data-i18n="lang.label">Language</span>
+      <select id="langSelect"></select>
+    </label>
   </div>
 </header>
 
 <div id="table">
-  <canvas id="cv" aria-label="Jigsaw puzzle table. Drag pieces onto the board."></canvas>
+  <canvas id="cv" aria-label="Jigsaw puzzle table. Drag pieces onto the board." data-i18n-label="canvas.label"></canvas>
   <div class="players" id="players" hidden></div>
   <!-- after "Admire the painting": what to do next, just below the finished board -->
   <div class="after" id="afterBar" hidden>
     <span class="after-done" id="afterTitle">Finished</span>
-    <button class="btn primary" id="afterNext">Next painting →</button>
-    <button class="btn" id="afterStory">Read the story</button>
+    <button class="btn primary" id="afterNext" data-i18n="after.next">Next painting →</button>
+    <button class="btn" id="afterStory" data-i18n="after.story">Read the story</button>
     <span class="note after-wait" id="afterWait" hidden></span>
   </div>
-  <div class="hint gone" id="hint">Drag a piece onto the board. It settles in when it's close.</div>
+  <div class="hint gone" id="hint" data-i18n="hint">Drag a piece onto the board. It settles in when it’s close.</div>
 
   <div class="menu" id="menu" role="dialog" aria-labelledby="menuTitle">
     <div class="menu-panel">
@@ -57,46 +60,46 @@
       </div>
       <div class="menu-form">
         <div>
-          <div class="eyebrow">A slow game of famous paintings</div>
+          <div class="eyebrow" data-i18n="menu.eyebrow">A slow game of famous paintings</div>
           <h2 id="menuTitle">Masterpiece Jigsaw</h2>
         </div>
-        <p class="lede">Piece together sixteen masterpieces, from Leonardo to Hokusai, alone or with friends at the same table. Each finished painting comes with its story.</p>
+        <p class="lede" data-i18n="menu.lede">Piece together sixteen masterpieces, from Leonardo to Hokusai, alone or with friends at the same table. Each finished painting comes with its story.</p>
 
         <div>
-          <label class="lab" for="nameInput">Your name</label>
+          <label class="lab" for="nameInput" data-i18n="menu.name">Your name</label>
           <div class="namerow">
             <span class="avatar big" id="meAvatar">?</span>
-            <input class="field" id="nameInput" maxlength="18" placeholder="Type your name" autocomplete="nickname" spellcheck="false">
+            <input class="field" id="nameInput" maxlength="18" placeholder="Type your name" data-i18n-placeholder="menu.name.placeholder" autocomplete="nickname" spellcheck="false">
           </div>
-          <div class="swatches" id="swatches" role="radiogroup" aria-label="Avatar colour"></div>
+          <div class="swatches" id="swatches" role="radiogroup" aria-label="Avatar colour" data-i18n-label="menu.colours"></div>
         </div>
 
         <div class="banner" id="inviteBanner" hidden>
           <b id="bannerTitle">You're invited to a table</b>
-          <span>Type your name and press Join. You'll play at the leader's level.</span>
+          <span data-i18n="menu.banner.text">Type your name and press Join. You’ll play at the leader’s level.</span>
         </div>
 
         <div id="hostArea" style="display:flex;flex-direction:column;gap:20px">
         <div>
-          <span class="lab" id="levelLab">Level</span>
+          <span class="lab" id="levelLab" data-i18n="menu.level">Level</span>
           <div class="levels" role="group" aria-labelledby="levelLab">
-            <button class="lvl" id="lvlEasy" data-level="easy" aria-pressed="true"><span class="thumb" data-n="4"></span><b>Easy</b><small>about 16 pieces</small></button>
-            <button class="lvl" id="lvlMedium" data-level="medium" aria-pressed="false"><span class="thumb" data-n="6"></span><b>Medium</b><small>about 36 pieces</small></button>
-            <button class="lvl" id="lvlHard" data-level="hard" aria-pressed="false"><span class="thumb" data-n="10"></span><b>Hard</b><small>about 100, blurred guide</small></button>
+            <button class="lvl" id="lvlEasy" data-level="easy" aria-pressed="true"><span class="thumb" data-n="4"></span><b data-i18n="level.easy">Easy</b><small data-i18n="level.easy.note">about 16 pieces</small></button>
+            <button class="lvl" id="lvlMedium" data-level="medium" aria-pressed="false"><span class="thumb" data-n="6"></span><b data-i18n="level.medium">Medium</b><small data-i18n="level.medium.note">about 36 pieces</small></button>
+            <button class="lvl" id="lvlHard" data-level="hard" aria-pressed="false"><span class="thumb" data-n="10"></span><b data-i18n="level.hard">Hard</b><small data-i18n="level.hard.note">about 100, blurred guide</small></button>
           </div>
         </div>
 
-        <button class="btn primary big" id="startBtn">Start a table</button>
+        <button class="btn primary big" id="startBtn" data-i18n="menu.start">Start a table</button>
 
-        <div class="or">or join a friend's table</div>
+        <div class="or" data-i18n="menu.or">or join a friend’s table</div>
         </div>
         <div>
           <div class="joinrow">
-            <input class="field" id="codeInput" maxlength="5" placeholder="Code" autocomplete="off" spellcheck="false" aria-label="Table code">
-            <button class="btn big" id="joinBtn">Join</button>
+            <input class="field" id="codeInput" maxlength="5" placeholder="Code" autocomplete="off" spellcheck="false" aria-label="Table code" data-i18n-placeholder="menu.code.placeholder" data-i18n-label="menu.code.label">
+            <button class="btn big" id="joinBtn" data-i18n="menu.join">Join</button>
           </div>
-          <p class="note" id="joinNote" style="margin-top:8px">You'll play at your friend's level.</p>
-          <button class="linkish" id="ownTableBtn" hidden>Start my own table instead</button>
+          <p class="note" id="joinNote" style="margin-top:8px" data-i18n="menu.joinNote">You’ll play at your friend’s level.</p>
+          <button class="linkish" id="ownTableBtn" hidden data-i18n="menu.ownTable">Start my own table instead</button>
         </div>
         <p class="msg" id="menuMsg" aria-live="polite"></p>
       </div>
@@ -106,90 +109,90 @@
   <!-- shown over the main menu when someone opens an invite link -->
   <div class="pop" id="invitePop" role="dialog" aria-modal="true" aria-labelledby="popTitle" hidden>
     <div class="pop-card">
-      <button class="pop-x" id="popClose" aria-label="Close and go to the main menu">×</button>
-      <div class="eyebrow">You're invited</div>
+      <button class="pop-x" id="popClose" aria-label="Close and go to the main menu" data-i18n-label="pop.close">×</button>
+      <div class="eyebrow" data-i18n="pop.eyebrow">You’re invited</div>
       <h2 id="popTitle">Join table</h2>
-      <p class="note">A friend sent you a link to their table. You'll play at their level.</p>
+      <p class="note" data-i18n="pop.note">A friend sent you a link to their table. You’ll play at their level.</p>
       <div>
-        <label class="lab" for="popName">Your name</label>
+        <label class="lab" for="popName" data-i18n="menu.name">Your name</label>
         <div class="namerow">
           <span class="avatar big" id="popAvatar">?</span>
-          <input class="field" id="popName" maxlength="18" placeholder="Type your name" autocomplete="nickname" spellcheck="false">
+          <input class="field" id="popName" maxlength="18" placeholder="Type your name" data-i18n-placeholder="menu.name.placeholder" autocomplete="nickname" spellcheck="false">
         </div>
       </div>
       <div>
-        <label class="lab" for="popCode">Table code</label>
+        <label class="lab" for="popCode" data-i18n="pop.code">Table code</label>
         <input class="field codefield" id="popCode" maxlength="5" autocomplete="off" spellcheck="false">
       </div>
-      <button class="btn primary big" id="popJoin">Join table</button>
+      <button class="btn primary big" id="popJoin" data-i18n="pop.join">Join table</button>
       <p class="msg" id="popMsg" aria-live="polite"></p>
     </div>
   </div>
 
   <div class="card wide" id="infoCard" role="dialog" aria-labelledby="infoTitle">
-    <button class="btn close" id="infoClose" aria-label="Close">Close</button>
+    <button class="btn close" id="infoClose" data-i18n="card.close">Close</button>
     <div class="eyebrow" id="infoEyebrow">The story</div>
     <h2 id="infoTitle">Mona Lisa</h2>
     <dl>
-      <dt>Artist</dt><dd id="iArtist"></dd>
-      <dt>Made</dt><dd id="iYear"></dd>
-      <dt>Medium</dt><dd id="iMedium"></dd>
-      <dt>Home</dt><dd id="iHome"></dd>
+      <dt data-i18n="info.artist">Artist</dt><dd id="iArtist"></dd>
+      <dt data-i18n="info.made">Made</dt><dd id="iYear"></dd>
+      <dt data-i18n="info.medium">Medium</dt><dd id="iMedium"></dd>
+      <dt data-i18n="info.home">Home</dt><dd id="iHome"></dd>
       <dt hidden id="iTimeL">Your time</dt><dd hidden id="iTime"></dd>
-      <dt hidden id="iLevelL">Level</dt><dd hidden id="iLevel"></dd>
+      <dt hidden id="iLevelL" data-i18n="info.level">Level</dt><dd hidden id="iLevel"></dd>
     </dl>
     <div class="story" id="iStory"></div>
     <div class="row" id="doneRow" hidden>
-      <button class="btn primary" id="nextBtn">Next painting</button>
-      <button class="btn" id="admireBtn">Admire the painting</button>
+      <button class="btn primary" id="nextBtn" data-i18n="info.next">Next painting</button>
+      <button class="btn" id="admireBtn" data-i18n="info.admire">Admire the painting</button>
     </div>
     <p class="note" id="waitNote" hidden></p>
   </div>
 
   <div class="card wide" id="galleryCard" role="dialog" aria-labelledby="galTitle">
-    <button class="btn close" id="galClose" aria-label="Close">Close</button>
-    <div class="eyebrow">The collection</div>
-    <h2 id="galTitle">Choose a painting</h2>
+    <button class="btn close" id="galClose" data-i18n="card.close">Close</button>
+    <div class="eyebrow" data-i18n="gal.eyebrow">The collection</div>
+    <h2 id="galTitle" data-i18n="gal.title">Choose a painting</h2>
     <p class="note" id="galNote">Your current puzzle is set aside and the one you pick starts as a new round at the same level, for everyone at the table.</p>
     <div class="grid" id="galGrid"></div>
   </div>
 
   <div class="card" id="inviteCard" role="dialog" aria-labelledby="invTitle">
-    <button class="btn close" id="invClose" aria-label="Close">Close</button>
-    <div class="eyebrow">Play together</div>
-    <h2 id="invTitle">Invite friends</h2>
+    <button class="btn close" id="invClose" data-i18n="card.close">Close</button>
+    <div class="eyebrow" data-i18n="inv.eyebrow">Play together</div>
+    <h2 id="invTitle" data-i18n="inv.title">Invite friends</h2>
     <div id="invOn">
       <div style="display:flex;flex-direction:column;gap:14px">
         <div class="code" id="invCode">ABCDE</div>
         <div class="row">
-          <button class="btn primary" id="copyLink">Copy link</button>
-          <button class="btn" id="copyCode">Copy code</button>
+          <button class="btn primary" id="copyLink" data-i18n="inv.copyLink">Copy link</button>
+          <button class="btn" id="copyCode" data-i18n="inv.copyCode">Copy code</button>
           <span class="note" id="copyMsg" aria-live="polite"></span>
         </div>
         <ol class="steps">
-          <li>Send the link. It opens this table, so friends only type their name and press Join.</li>
-          <li>Or send the code. Friends open the game and enter it under "Join a friend's table".</li>
-          <li>You lead the table: you choose each painting and can remove anyone who joins.</li>
+          <li data-i18n="inv.step1">Send the link. It opens this table, so friends only type their name and press Join.</li>
+          <li data-i18n="inv.step2">Or send the code. Friends open the game and enter it under "Join a friend's table".</li>
+          <li data-i18n="inv.step3">You lead the table: you choose each painting and can remove anyone who joins.</li>
         </ol>
-        <p class="note">The page is private until you share it with your friends from the Share menu. They need contributor or edit access to move pieces; with view-only access they can watch.</p>
+        <p class="note" data-i18n="inv.claudeNote" data-claude-only>The page is private until you share it with your friends from the Share menu. They need contributor or edit access to move pieces; with view-only access they can watch.</p>
         <p class="note" id="invCount"></p>
       </div>
     </div>
-    <p class="note" id="invOff" hidden>Tables can't connect here, so inviting friends isn't available. You can keep playing on your own.</p>
+    <p class="note" id="invOff" hidden data-i18n="inv.off">Tables can't connect here, so inviting friends isn't available. You can keep playing on your own.</p>
   </div>
 
   <div class="card" id="exitCard" role="dialog" aria-labelledby="exitTitle">
-    <div class="eyebrow">Main menu</div>
-    <h2 id="exitTitle">Leave this table?</h2>
+    <div class="eyebrow" data-i18n="exit.eyebrow">Main menu</div>
+    <h2 id="exitTitle" data-i18n="exit.title">Leave this table?</h2>
     <p class="note" id="exitNote"></p>
     <div class="row">
-      <button class="btn primary" id="exitStay">Keep playing</button>
-      <button class="btn" id="exitGo">Exit to main menu</button>
+      <button class="btn primary" id="exitStay" data-i18n="exit.stay">Keep playing</button>
+      <button class="btn" id="exitGo" data-i18n="exit.go">Exit to main menu</button>
     </div>
   </div>
 
   <div class="card" id="switchCard" role="dialog" aria-labelledby="switchTitle">
-    <div class="eyebrow">Puzzle in progress</div>
+    <div class="eyebrow" data-i18n="switch.eyebrow">Puzzle in progress</div>
     <div class="switch-pair">
       <span class="swatch-art" id="switchFrom"></span><span class="arrow" aria-hidden="true">→</span><span class="swatch-art" id="switchTo"></span>
     </div>
@@ -202,12 +205,12 @@
   </div>
 
   <div class="card" id="kickCard" role="dialog" aria-labelledby="kickTitle">
-    <div class="eyebrow">Table leader</div>
+    <div class="eyebrow" data-i18n="kick.eyebrow">Table leader</div>
     <div class="row" style="gap:12px"><span class="avatar big" id="kickAvatar"></span><h2 id="kickTitle">Remove this player?</h2></div>
-    <p class="note">They leave the table straight away and can't rejoin this table. Pieces they placed stay on the board.</p>
+    <p class="note" data-i18n="kick.note">They leave the table straight away and can't rejoin this table. Pieces they placed stay on the board.</p>
     <div class="row">
-      <button class="btn primary" id="kickYes">Remove from table</button>
-      <button class="btn" id="kickNo">Keep playing together</button>
+      <button class="btn primary" id="kickYes" data-i18n="kick.yes">Remove from table</button>
+      <button class="btn" id="kickNo" data-i18n="kick.no">Keep playing together</button>
     </div>
   </div>
 </div>

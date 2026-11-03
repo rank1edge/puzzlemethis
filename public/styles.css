@@ -211,6 +211,20 @@ button.chip{font:inherit;color:var(--ink);cursor:pointer;pointer-events:auto;tex
 button.chip:hover{border-color:var(--varnish)}
 button.chip .x{color:var(--muted);font-size:13px;margin-left:2px}
 
+/* language dropdown */
+.lang{position:relative;display:inline-flex;align-items:center;background:var(--chip);border-radius:999px;padding-left:10px}
+.lang:hover{background:var(--line)}
+.lang:focus-within{outline:2px solid var(--varnish);outline-offset:2px}
+.lang-icon{color:var(--muted);flex:none}
+.lang select{
+  appearance:none;-webkit-appearance:none;border:0;background:transparent;color:var(--ink);
+  font:500 13px/1 var(--body);padding:8px 26px 8px 6px;cursor:pointer;outline:none;
+  background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);
+  background-position:calc(100% - 14px) 52%,calc(100% - 10px) 52%;background-size:4px 4px,4px 4px;background-repeat:no-repeat;
+}
+.lang select option{color:#283025;background:#fff}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
 /* bar under a finished painting */
 .after{
   position:absolute;left:0;right:0;margin-inline:auto;width:fit-content;z-index:2;

@@ -46,7 +46,7 @@ test('the leader removes a friend, who cannot rejoin', async ({ browser }) => {
   await expect(a.locator('#players')).not.toContainText('Priya');
   await b.fill('#codeInput', code);
   await b.click('#joinBtn');
-  await expect(b.locator('#menuMsg')).toContainText("can't rejoin");
+  await expect(b.locator('#menuMsg')).toContainText(/can.t rejoin/);
 });
 
 test('only the leader can pick the painting', async ({ browser }) => {
