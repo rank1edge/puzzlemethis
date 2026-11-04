@@ -580,12 +580,19 @@ function sharePointer(px, py) {
   table.presence(patch).catch(() => {});
 }
 
+// Pressing on the table must never start a text selection, a long-press menu,
+// a page scroll or a pinch zoom (all of which iOS and Android try to do).
+cv.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button === 0) e.preventDefault(); }, { capture: true });
+cv.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+cv.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('selectstart', e => { if (drag || (e.target && e.target === cv)) e.preventDefault(); });
 cv.addEventListener('pointerdown', e => {
   if (done || !level || !pic || spectator) return;
   const [px, py] = toLocal(e), i = hit(px, py);
   if (i < 0) return;
   const p = pieces[i]; toTop(p);
   p.tx = p.ty = undefined;
+  try { const sel = getSelection(); if (sel && sel.rangeCount) sel.removeAllRanges(); } catch (err) {}
   drag = { p, dx: (px - board.x) / s - p.x, dy: (py - board.y) / s - p.y, id: e.pointerId };
   sharePointer(px, py);
   cv.setPointerCapture(e.pointerId);

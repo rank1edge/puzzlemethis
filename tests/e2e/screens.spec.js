@@ -218,6 +218,8 @@ test('touch: the board never scrolls the page while dragging', async ({ browser 
   await page.goto('/');
   await page.fill('#nameInput', 'Ajay'); await page.click('#startBtn');
   expect(await page.evaluate(() => getComputedStyle(document.getElementById('cv')).touchAction)).toBe('none');
+  // the first painting loads asynchronously; wait until its pieces are dealt
+  await expect.poll(() => page.evaluate(() => mjDebug.layout().loose.length)).toBeGreaterThan(0);
   // a touch drag moves a piece like a mouse drag does
   const L = await page.evaluate(() => mjDebug.layout());
   const [x, y, w, h] = L.loose[L.loose.length - 1];
@@ -231,5 +233,45 @@ test('touch: the board never scrolls the page while dragging', async ({ browser 
     cv.dispatchEvent(new PointerEvent('pointerup', { ...o, clientX: sx + 60, clientY: sy - 40 }));
   }, [sx, sy]);
   expect(await page.evaluate(() => JSON.stringify(mjDebug.pieces().map(p => [p.x, p.y])))).not.toBe(before);
+  await context.close();
+});
+
+test('touch: a long press on the table never selects text or opens Copy / Search menus', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  await page.goto('/');
+  await page.fill('#nameInput', 'Ajay'); await page.click('#startBtn');
+  await expect(page.locator('#menu')).toHaveClass(/gone/);
+  const r = await page.evaluate(() => {
+    const css = sel => { const s = getComputedStyle(document.querySelector(sel)); return s.userSelect || s.webkitUserSelect; };
+
+    const cv = document.getElementById('cv'), o = { pointerId: 3, pointerType: 'touch', isPrimary: true, bubbles: true, cancelable: true, clientX: 200, clientY: 400 };
+    const down = new PointerEvent('pointerdown', o); cv.dispatchEvent(down);
+    cv.dispatchEvent(new PointerEvent('pointerup', o));
+    const menu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true }); cv.dispatchEvent(menu);
+    const sel = new Event('selectstart', { bubbles: true, cancelable: true }); cv.dispatchEvent(sel);
+    let touch = null;
+    try { const t = new Touch({ identifier: 1, target: cv, clientX: 200, clientY: 400 });
+      const ev = new TouchEvent('touchstart', { touches: [t], targetTouches: [t], changedTouches: [t], bubbles: true, cancelable: true });
+      cv.dispatchEvent(ev); touch = ev.defaultPrevented; } catch (e) {}
+    return {
+      header: css('header h1'), stats: css('.stats'), players: css('.players'), hint: css('#hint'),
+      name: css('#nameInput'), story: css('.story'),
+      downPrevented: down.defaultPrevented, menuPrevented: menu.defaultPrevented, selectPrevented: sel.defaultPrevented, touchPrevented: touch,
+      tapHighlight: getComputedStyle(document.documentElement).webkitTapHighlightColor
+    };
+  });
+  for (const k of ['header', 'stats', 'players', 'hint']) expect(r[k], k).toBe('none');
+  // -webkit-touch-callout (the iOS long-press menu) exists only in Safari, and
+  // Chromium drops it when parsing, so check the stylesheet's own text
+  const css = await page.evaluate(async () => (await fetch('styles.css')).text());
+  expect(css).toMatch(/(^|\n)body\{[^}]*-webkit-touch-callout:none/);
+  expect(r.name).not.toBe('none');                    // typing fields stay selectable
+  expect(r.story).not.toBe('none');                   // and so do the stories
+  expect(r.downPrevented).toBe(true);
+  expect(r.menuPrevented).toBe(true);
+  expect(r.selectPrevented).toBe(true);
+  if (r.touchPrevented !== null) expect(r.touchPrevented).toBe(true);
+  expect(r.tapHighlight).toBe('rgba(0, 0, 0, 0)');
   await context.close();
 });
